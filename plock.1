@@ -1,0 +1,126 @@
+.TH PLOCK 1 "04 Feb 1992" "IMMD4"
+.SH NAME
+plock \- Locks the local X display and kills the session after 15 Minutes, unless password is entered
+
+.SH SYNOPSIS
+.B plock
+[
+.B \-demo
+]
+'''[
+'''.B \-nolock
+''']
+[
+.B \-color
+]
+[
+.B \-noanim
+]
+[
+.B \-quiet
+]
+
+.SH DESCRIPTION
+.B Plock
+locks the X server till the user enters their password at the keyboard or
+the timeout of 15 Minutes is over.
+While
+.B plock
+is running,
+all new server connections are refused.
+The screen saver is disabled.
+The mouse cursor is turned off.
+The screen displays a parking meter that shows the number of minutes remaining.
+
+If the correct password is typed, then the screen is unlocked and the X
+server is restored. When typing the password Control-H and Backspace are
+both active as erase keys. 
+
+When the parking time is exceeded, an animation sequence is played that 
+visualises the dramatic act of logging off unvoluntarily.
+.TP 5
+When logging off, the following processes are affected:
+
+all the user's processes that have /dev/console as their
+controlling terminal. 
+      
+on hpux hosts processes that have a name starting with 'X'
+are also included, as the /dev/console method usually fails.
+.PP
+The first attempt to remove these processes is sending them SIGHUP each.
+After a pause of 15 seconds SIGTERM is sent. If any processes remain,
+they are sent SIGKILL after another delay of 15 seconds.
+Logging off is announced via syslog.
+
+.SH OPTIONS
+.TP 5
+.B \-demo
+The
+.I demo
+option causes the parking meter's time unit to be two seconds instead of
+one minute.
+.TP 5
+.B \-color
+The
+.I color
+option causes 
+.B plock 
+to display color pixels rather than the default black/white
+ones. This only effects 8-bit color displays.
+'''.TP 5
+'''.B \-nolock
+'''The
+'''.I nolock
+'''option causes 
+'''.B plock
+'''to only draw the parking meter in a regular window and 
+'''not lock the display. The user is not logged off when the time is up.
+.TP 5
+.B \-noanim
+The
+.I noanim
+option prevents 
+.B plock
+from playing the animation sequence when the time is up.
+.TP 5
+.B \-quiet
+The
+.I quiet 
+option prevents 
+.B plock 
+from playing sound while the animation is running.
+All systems different from sparc are quiet per default.
+
+.SH VERSION
+This is version 0.1 of
+.BR plock .
+
+.SH DISCALIMER
+This program is distributed in the hope that it will be usefull, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. 
+
+.SH BUGS
+.B Plock
+calls "/bin/ps" to get a list of processes. The logout mechanism 
+relies on the formatting of that list. 
+.br
+Under extreme circumstances all, none or wrong processes may be killed.
+.br
+.B Plock's
+logout mechanism does not work on X-Terminals.
+.br
+It is not recommended for root to use 
+.B plock.
+.br
+The animation sequences are hardcoded.
+
+.SH SEE ALSO
+xlock(1)
+.br
+X(1), Xlib Documentation.
+
+.SH AUTHORS
+ Rudolf Koenig		(rfkoenig@immd4)
+ Juergen Weigert	(jnweiger@immd4)
+
