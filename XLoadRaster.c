@@ -1,8 +1,10 @@
 /*
  * XLoadRaster.c -- plock loads rasterfiles
+ *
+
  */
-#include "sccs.h"
-SCCS_ID("@(#)XLoadRaster.c	1.2 92/02/21 17:45:45 FAU");
+#include "rcs.h"
+RCS_ID("$Id$ FAU");
 
 #include <X11/Xlib.h>
 #include <sys/errno.h>
@@ -12,12 +14,14 @@ SCCS_ID("@(#)XLoadRaster.c	1.2 92/02/21 17:45:45 FAU");
 
 extern int errno;
 
-#ifdef hpux
-extern void free();
-extern void *malloc();
-#else
-extern int free();
-extern char *malloc();
+#ifndef __GNUC__
+# ifdef sun
+    extern int free();
+    extern char *malloc();
+# else
+    extern void free();
+    extern void *malloc();
+# endif
 #endif
 
 #ifdef COMMENT
@@ -43,7 +47,7 @@ static void my_free(cm, d)
     }
 }
 
-#define GETC(c, fp) if((c=getc(fp)) == EOF) {errno=EINVAL; my_free(cmap, data); return NULL;} 
+#define GETC(c, fp) if((c=getc(fp)) == EOF) {errno=EINVAL; debug("GETC\n"); my_free(cmap, data); return NULL;} 
 
 static unsigned int shifts[8] = 
 {
@@ -69,7 +73,7 @@ int bitmap_pad;
   if ((new_data = (char *)malloc(im->height * new_bpl)) == NULL)
     {
       errno = ENOMEM; 
-      return NULL;
+      return 0;
     }
 
   for (j = 0; j < im->height; j++)
@@ -109,6 +113,7 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
 
   if(!fread((char *)&rf, sizeof(rf), 1, fp) || rf.ras_magic != RAS_MAGIC)
     {
+      debug(" != RAS_MAGIC\n");
       errno = EINVAL; return NULL;
     }
   if(! (rf.ras_type == RT_STANDARD || rf.ras_type == RT_BYTE_ENCODED) ||
@@ -116,6 +121,7 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
      ! (rf.ras_maptype == RMT_NONE || rf.ras_maptype == RMT_EQUAL_RGB) ||
      ! (rf.ras_width || rf.ras_height))
     {
+      debug(" no rt. ... \n");
       errno = EINVAL; return NULL;
     }
 
@@ -146,6 +152,7 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
          !fread((char *)cmap->map[1], cmap->length / 3, 1, fp) ||
          !fread((char *)cmap->map[2], cmap->length / 3, 1, fp))
 	{
+	  debug(" bad cmap \n");
 	  errno = EINVAL;
 	  my_free(cmap, data);
 	  return NULL;
@@ -160,6 +167,7 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
 	{
 	  if(!fread(dp, bpl2, 1, fp))
 	    {
+	      debug(" bad data\n");
 	      errno = EINVAL;
 	      my_free(cmap, data);
 	      return NULL;
@@ -169,6 +177,7 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
     }
   else
     {
+      debug("BYTE_ENCODED\n");
       dp = data;
       j = bpl2 = ((rf.ras_depth == 1 ? (rf.ras_width + 7) / 8 : rf.ras_width) + 1) & ~1;
       i = rf.ras_height;
@@ -185,6 +194,7 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
 	      if (c == RAS_ESC)
 		{
 		  GETC(k, fp);
+		  debug1("RAS_ESC, k=%d\n", k);
 		  if (k != 0)
 		    {
 		      count += k;
@@ -207,8 +217,10 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
 		    0, (char *)data,
 		    (unsigned)rf.ras_width, (unsigned)rf.ras_height, 
 		    bitmap_pad, bpl);
+
   if(!im) 
     {
+      debug("XCreateImage\n");
       errno = EINVAL;
       my_free(cmap, data);
       return NULL;

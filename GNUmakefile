@@ -1,7 +1,13 @@
+# The clock does 15 tickes, speed of the clock:
+# -DSEC_PER_TICK=60		15 Minutes
+# -DSEC_PER_TICK=120		30 Minutes
+# -DSEC_PER_TICK=180		45 Minutes
+SPEED=60
+
 CC = gcc
-CFLAGS = -O -Wall -pipe -I/local/X11/include #-DSEC_PER_TICK=120
+CFLAGS = -O6 -Wall -pipe -I/local/X11R5/include -DSEC_PER_TICK=$(SPEED)
 X11LIB = -L/local/X11R5/lib -lX11 
-LDFLAGS = -Bstatic
+LDFLAGS = #-static
 
 OBJS = plock.o anim.o image.o XLoadRaster.o explode.o snd.o
 

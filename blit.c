@@ -1,8 +1,16 @@
 /*
  * blit.c -- plock image composition with an amiga-like blit routine
  */
-#include "sccs.h"
-SCCS_ID("@(#)blit.c	1.2 92/02/21 17:45:51 FAU");
+
+/*
+ * blit operates on XLONG data. Take care of alignment problems!
+ */
+#define XLONG unsigned long
+
+
+
+#define SIZL (sizeof(XLONG))
+#define BITL (sizeof(XLONG)*8)
 
 void
 im2im(sim, sbpl, sx, sy,
@@ -18,67 +26,67 @@ int w, h;
   int drop = 0, ww, mshift, ashift;
   void blit();
 
-  d = dim + dy * dbpl + (dx >> 5) * 4;
-  ww = (dx + w - 1 >> 5) * 4 - (dx >> 5) * 4 + 4;
-  ashift = (dx & 31) - (sx & 31);
-  a = sim + sy * sbpl + (sx >> 5) * 4;
+  d = dim + dy * dbpl + (dx / BITL) * SIZL;
+  ww = ((dx + w - 1) / BITL) * SIZL - (dx / BITL) * SIZL + SIZL;
+  ashift = (dx & (BITL-1)) - (sx & (BITL-1));
+  a = sim + sy * sbpl + (sx / BITL) * SIZL;
 
   if (mim == 0)
     {
       if (ashift < 0)
 	{
-	  ashift += 32;
+	  ashift += BITL;
 	  drop = 1;
 	}
-      blit((unsigned long *)a,            sbpl - ww - drop * 4,
-	   (unsigned long *)0,            0,
-	   (unsigned long *)0,            0,
-	   (unsigned long *)d,            dbpl - ww,
+      blit((XLONG *)a,            sbpl - ww - drop * SIZL,
+	   (XLONG *)0,            0,
+	   (XLONG *)0,            0,
+	   (XLONG *)d,            dbpl - ww,
 	   ww, h, 0xf0, ashift, 0, drop,
-	   ((unsigned long)0xffffffff >> (dx & 31)),
-	   ((unsigned long)0xffffffff << ((dx + w - 1 & 31) ^ 31)));
+	   ((XLONG)~0l >> (dx & (BITL-1))),
+	   ((XLONG)~0l << (((dx + w - 1) & (BITL-1)) ^ (BITL-1))));
     }
   else
     {
-      mshift = (dx & 31) - (mx & 31);
-      m = mim + my * mbpl + (mx >> 5) * 4;
+      mshift = (dx & (BITL-1)) - (mx & (BITL-1));
+      m = mim + my * mbpl + (mx / BITL) * SIZL;
       if (ashift < 0)
 	{
-	  ashift += 32;
+	  ashift += BITL;
 	  if (mshift < 0)
-	    mshift += 32;
+	    mshift += BITL;
 	  else
-	    m -= 4;
+	    m -= SIZL;
 	  drop = 1;
 	}
       else
 	{
 	  if (mshift < 0)
 	    {
-	      mshift += 32;
-	      a -= 4;
+	      mshift += BITL;
+	      a -= SIZL;
 	      drop = 1;
 	    }
 	}
-      blit((unsigned long *)a,              sbpl - ww - drop * 4,
-	   (unsigned long *)m,              mbpl - ww - drop * 4,
-	   (unsigned long *)(d - drop * 4), dbpl - ww - drop * 4,
-	   (unsigned long *)d,              dbpl - ww,
+      blit((XLONG *)a,                 sbpl - ww - drop * SIZL,
+	   (XLONG *)m,                 mbpl - ww - drop * SIZL,
+	   (XLONG *)(d - drop * SIZL), dbpl - ww - drop * SIZL,
+	   (XLONG *)d,                 dbpl - ww,
 	   ww, h, 0xe2, ashift, mshift, drop,
-	   ((unsigned long)0xffffffff >> (dx & 31)),
-	   ((unsigned long)0xffffffff << ((dx + w - 1 & 31) ^ 31)));
+	   ((XLONG)~0l >> (dx & (BITL-1))),
+	   ((XLONG)~0l << (((dx + w - 1) & (BITL-1)) ^ (BITL-1))));
     }
 }
 
 void
 blit(a, ma, b, mb, c, mc, d, md, w, h, mint, sa, sb, dropfl, fmd, lmd)
-register unsigned long *a,*b,*c,*d;
-unsigned long fmd, lmd;
+register XLONG *a,*b,*c,*d;
+XLONG fmd, lmd;
 int ma,mb,mc,md;
 int sa,sb, dropfl, w, h, mint;
 {
-  register unsigned long xa, xb, xc, xd;
-  unsigned long oa, ob;
+  register XLONG xa, xb, xc, xd;
+  XLONG oa, ob;
   int ww, drop;
 
   xa = xb = xc = xd = 0;
@@ -94,10 +102,10 @@ int sa,sb, dropfl, w, h, mint;
 	      xa = *a++;
 	      if (sa > 0)
 		{
-		  register unsigned long ooa;
+		  register XLONG ooa;
 
 		  ooa = xa;
-		  xa = (xa >> sa) | (oa << (32 - sa));
+		  xa = (xa >> sa) | (oa << (BITL - sa));
 		  oa = ooa;
 		}
 	    }
@@ -106,10 +114,10 @@ int sa,sb, dropfl, w, h, mint;
 	      xb = *b++;
 	      if (sb > 0)
 		{
-		  register unsigned long oob;
+		  register XLONG oob;
 
 		  oob = xb;
-		  xb = (xb >> sb) | (ob << (32 - sb));
+		  xb = (xb >> sb) | (ob << (BITL - sb));
 		  ob = oob;
 		}
 	    }
@@ -121,7 +129,7 @@ int sa,sb, dropfl, w, h, mint;
 	      xd = xa;
 	      break;
 	    case 0xe2:
-	      xd = xa & xb | xc & ~xb;
+	      xd = (xa & xb) | (xc & ~xb);
 	      break;
 	    default:
 	      abort();
@@ -131,15 +139,15 @@ int sa,sb, dropfl, w, h, mint;
 	  else
 	    {
 	      if (ww == w)
-	        xd = xd & fmd | *d & ~fmd;
-	      if ((ww -= 4) == 0)
-	        xd = xd & lmd | *d & ~lmd;
+	        xd = (xd & fmd) | (*d & ~fmd);
+	      if ((ww -= SIZL) == 0)
+	        xd = (xd & lmd) | (*d & ~lmd);
 	      *d++ = xd;
 	    }
 	}
-      a = (unsigned long *)((unsigned char *)a + ma);
-      b = (unsigned long *)((unsigned char *)b + mb);
-      c = (unsigned long *)((unsigned char *)c + mc);
-      d = (unsigned long *)((unsigned char *)d + md);
+      a = (XLONG *)((unsigned char *)a + ma);
+      b = (XLONG *)((unsigned char *)b + mb);
+      c = (XLONG *)((unsigned char *)c + mc);
+      d = (XLONG *)((unsigned char *)d + md);
     }
 }

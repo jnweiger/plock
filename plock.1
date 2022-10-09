@@ -4,25 +4,16 @@ plock \- Locks the local X display and kills the session after 15 Minutes, unles
 
 .SH SYNOPSIS
 .B plock
-[
-.B \-demo
-]
-'''[
-'''.B \-nolock
-''']
-[
-.B \-color
-]
-[
-.B \-noanim
-]
-[
-.B \-quiet
-]
+.RB [ \-demo ]
+.RB [ \-nolock ]
+.RB [ \-color ]
+.RB [ \-noanim ]
+.RB [ \-quiet ]
+.RB [ \-noise ]
 
 .SH DESCRIPTION
 .B Plock
-locks the X server till the user enters their password at the keyboard or
+locks the X server till the user enters his password at the keyboard or
 the timeout of 15 Minutes is over.
 While
 .B plock
@@ -30,6 +21,7 @@ is running,
 all new server connections are refused.
 The screen saver is disabled.
 The mouse cursor is turned off.
+The beeper volume is zero.
 The screen displays a parking meter that shows the number of minutes remaining.
 
 If the correct password is typed, then the screen is unlocked and the X
@@ -47,7 +39,7 @@ controlling terminal.
 on hpux hosts processes that have a name starting with 'X'
 are also included, as the /dev/console method usually fails.
 .PP
-The first attempt to remove these processes is sending them SIGHUP each.
+The first attempt to remove these processes is sending them a SIGHUP each.
 After a pause of 15 seconds SIGTERM is sent. If any processes remain,
 they are sent SIGKILL after another delay of 15 seconds.
 Logging off is announced via syslog.
@@ -67,14 +59,14 @@ option causes
 .B plock 
 to display color pixels rather than the default black/white
 ones. This only effects 8-bit color displays.
-'''.TP 5
-'''.B \-nolock
-'''The
-'''.I nolock
-'''option causes 
-'''.B plock
-'''to only draw the parking meter in a regular window and 
-'''not lock the display. The user is not logged off when the time is up.
+.TP 5
+.B \-nolock
+The
+.I nolock
+option causes 
+.B plock
+to only draw the parking meter in a regular window and 
+not lock the display. The user is not logged off when the time is up.
 .TP 5
 .B \-noanim
 The
@@ -90,15 +82,19 @@ option prevents
 .B plock 
 from playing sound while the animation is running.
 All systems different from sparc are quiet per default.
+.TP 5
+.B \-noise
+the 
+.I noise
+option prevents 
+.B plock
+from reducing the beeper volume to zero, while the parking meter
+is displayed.
 
 .SH VERSION
-This is version 0.1 of
+This is version 0.2 of
 .BR plock .
 
-.SH DISCALIMER
-This program is distributed in the hope that it will be usefull, but WITHOUT
-ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-FITNESS FOR A PARTICULAR PURPOSE. 
 
 .SH BUGS
 .B Plock
@@ -124,3 +120,9 @@ X(1), Xlib Documentation.
  Rudolf Koenig		(rfkoenig@immd4)
  Juergen Weigert	(jnweiger@immd4)
 
+.SH DISCALIMER
+This program is distributed in the hope that it will be usefull, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. 
+.br
+Distribute freely and credit us, make profit and share with us!

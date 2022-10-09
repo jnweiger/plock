@@ -1,8 +1,8 @@
 /*
  * image.c -- plock image manipulation for lemmings
  */
-#include "sccs.h"
-SCCS_ID("@(#)image.c	1.2 92/02/21 17:45:55 FAU");
+#include "rcs.h"
+RCS_ID("$Id$ FAU");
 
 #define SLOW_COPY 0
 
@@ -336,7 +336,8 @@ char *grid;
       w = (w + 7) / 8;
       x >>= 3;
       if (c)
-       c = 0xff;
+        c = 0xff;
+      c = 0;
       break;
     default:
       abort();

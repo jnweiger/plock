@@ -3,15 +3,19 @@
  *
  * jw 14.1.1992
  */
-#include "sccs.h"
-SCCS_ID("@(#)anim.c	1.8 92/02/21 17:45:47 FAU");
+#include "rcs.h"
+RCS_ID("$Id$ FAU");
+
 
 #include "plock.h"
 
 #define PADDING 32 /* bitmap_pad for XImage creation */
 #define GAIN 40	   /* volume of sparc /dev/audio */
 
+#ifndef index
 extern char *index();
+#endif
+extern int real_depth;
 struct _stage stage;
 
 static int mu_drawframe __P((int, int));
@@ -76,10 +80,7 @@ FILE *fp;
 {
   static no_colors_yet = 1;
   colormap_t cmap;
-  unsigned int depth;
   XImage *Im = NULL;
-
-  depth = DefaultDepth(Dis, Sc);
 
   cmap.map[0] = cmap.map[1] = cmap.map[2] = 0;
   Im = XLoadRasterfile(Dis, stage.vis, fp, &cmap, PADDING);
@@ -99,10 +100,10 @@ FILE *fp;
   if(cmap.map[1]) { free(cmap.map[1]); cmap.map[1] = 0; }
   if(cmap.map[2]) { free(cmap.map[2]); cmap.map[2] = 0; }
 
-  if (cmap.length > (3 << depth))
+  if (cmap.length > (3 << stage.depth))
     {
       fprintf(stderr, "FILE *fp: picture depth(%d) > display depth(%d)\n",
-	      cmap.length, depth);
+	      cmap.length, stage.depth);
       return NULL;
     }
   return Im;
@@ -138,10 +139,7 @@ char *name;
   FILE *fp;
   Pixrect *Pr;
   colormap_t cmap;
-  unsigned int depth;
   unsigned char *data;
-
-  depth = DefaultDepth(Dis, Sc);
 
   if ((fp = fopen(name, "r")) == NULL)
     {
@@ -155,10 +153,10 @@ char *name;
       return NULL;
     }
   fclose(fp);
-  if (cmap.length > (1 << depth) || (cmap.length == 0 && depth > 1))
+  if (cmap.length > (1 << stage.depth) || (cmap.length == 0 && stage.depth > 1))
     {
       fprintf(stderr, "%s: picture depth(%d) != display depth(%d)\n",
-	      name, cmap.length, depth);
+	      name, cmap.length, stage.depth);
       pr_destroy(Pr);
       fclose(fp);
       return NULL;
@@ -166,8 +164,8 @@ char *name;
   data = (unsigned char *)((struct mpr_data *)(Pr->pr_data))->md_image;
   (caddr_t)((struct mpr_data *)(Pr->pr_data))->md_image = NULL;
   pr_destroy(Pr);
-  Im = XCreateImage(Dis, stage.vis, depth,
-                    depth == 1 ? XYPixmap : ZPixmap, 0, (char *)data, 
+  Im = XCreateImage(Dis, stage.vis, stage.depth,
+                    stage.depth == 1 ? XYPixmap : ZPixmap, 0, (char *)data, 
                     Pr->pr_size.x, Pr->pr_size.y, 16, 0);
   if (Im->depth > 1)
     {
@@ -177,6 +175,28 @@ char *name;
 }
 #endif
 
+#if 0
+void
+AdjustImage(im)
+XImage *im;
+{
+/* Reverse the bits for some funny displays... */
+  if (im->depth == 1 && !stage.black)
+    {
+      int x, y, bpl = im->bytes_per_line;
+      unsigned char *dp;
+
+      dp = (unsigned char *)im->data;
+      for (y = 0; y < im->height; y++)
+        {
+          for (x = 0; x < bpl; x++)
+            dp[x] = ~dp[x];
+          dp += bpl;
+        }
+    }
+}
+#endif
+ 
 /* 
 #ifdef NOCATFILES
  * name is a concatenated archive of frames
@@ -274,7 +294,7 @@ int nframes, offset, xstep, ystep;
               return NULL;
             }
 	}
-      if (stage.depth == 1 && !stage.black)
+      if (real_depth == 1 && !stage.black)
         {
 	  /* we have to invert the image */
 	  char *p = (*Imp)->data;
@@ -314,7 +334,7 @@ int nframes, offset, xstep, ystep;
 #ifdef NOCATFILES
           sprintf(fmt, "%s/%s/%s", plockdir, maskdir, mask);
           sprintf(buf, fmt, i + offset);
-          if ((*Imp = LoadImageFromRasterfile(Dis, Sc, buf)) == NULL)
+	  if ((*Imp = LoadImageFromRasterfile(Dis, Sc, buf)) == NULL) 
 #else
 	  if ((*Imp = LoadImageFromRasterfileFp(Dis, Sc, fp)) == NULL)
 #endif
@@ -858,15 +878,12 @@ initstage()
   bcopy((char *)stage.Back, (char *)Im, sizeof(XImage));
   Im->data = (char *)calloc(Im->bytes_per_line, Im->height);
   stage.Work = Im;
-  if (stage.black)
+  w = stage.Work->data;
+  b = stage.Back->data;
+  ii = stage.depth == 1 ? 0xff : stage.black;
+  for (i = stage.Work->bytes_per_line * stage.Work->height; i > 0; i--)
     {
-      w = stage.Work->data;
-      b = stage.Back->data;
-      ii = stage.depth == 1 ? 0xff : stage.black;
-      for (i = stage.Work->bytes_per_line * stage.Work->height; i > 0; i--)
-	{
-	  *w++ = *b++ = ii;
-	}
+      *w++ = *b++ = ii;
     }
   
   /*
@@ -896,9 +913,7 @@ initstage()
       fprintf(stderr, "plock: Cannot load %s, HELP!\n", buf);
       return 1;
     }
-  if (stage.depth == 8 && options.color == 0)
-    Image1to8(&Im, PADDING);
-  if (stage.depth == 1 && !stage.black)
+  if (real_depth == 1 && !stage.black)
     {
       /* we have to invert the clock */
       char *p = Im->data;
@@ -910,6 +925,8 @@ initstage()
 	  p++;
 	}
     }
+  if (stage.depth == 8 && options.color == 0)
+    Image1to8(&Im, PADDING);
   stage.Clock = Im;
   {
     char p[256];
@@ -930,18 +947,6 @@ initstage()
     }
   if (stage.depth == 8 && options.color == 0)
     Image1to8(&Im, PADDING);
-  if (stage.depth == 1 && !stage.black)
-    {
-      /* we have to invert the scale */
-      char *p = Im->data;
-      int l = Im->bytes_per_line * Im->height;
-
-      while (l--)
-	{
-	  *p = ~(*p);
-	  p++;
-	}
-    }
   stage.Scale = Im;
   stage.xmin = stage.xmax = stage.ymin = stage.ymax = 0;
   
@@ -1133,20 +1138,28 @@ int dumpgrid()
   return 0;
 }
 
-void seework()
-{
-  XPutImage(stage.Dis, stage.Win, stage.bonw, stage.Work, 0,0,0,0, 1152, 900);
-}
-
-void seeback()
-{
-  XPutImage(stage.Dis, stage.Win, stage.bonw, stage.Back, 0,0,0,0, 1152, 900);
-}
-
 void see(im)
-XImage *im;
+  XImage *im;
 {
-  XPutImage(stage.Dis, stage.Win, stage.bonw, im, 0,0,0,0, im->width, im->height);
+#if USE_PIXMAP_IF_COLOR
+  static Pixmap pm = 0;
+  static GC pgc;
+
+  if(pm == 0)
+    {
+      pm = XCreatePixmap(stage.Dis, stage.Win, 
+					     stage.screenx, stage.screeny, 1);
+      pgc = XCreateGC(stage.Dis, pm, 0, 0);
+    }
+  XPutImage(stage.Dis, pm, pgc, im, 
+                                       0,0,0,0, stage.screenx, stage.screeny);
+  XCopyPlane(stage.Dis, pm,  stage.Win, stage.bonw,
+				     0,0, stage.screenx, stage.screeny, 0,0, 1);
+#else
+  XPutImage(stage.Dis, stage.Win, stage.bonw, im,
+                                       0,0,0,0, stage.screenx, stage.screeny);
+#endif
+  XFlush(stage.Dis);
 }
 
 
@@ -1198,7 +1211,6 @@ UpdateDisplayFromGrid()
 #if USE_PIXMAP_IF_COLOR
   static Pixmap pm = 0;
   static GC pgc;
-  static int real_depth = 0;
 #endif
 
   g = stage.grid;
@@ -1231,10 +1243,6 @@ UpdateDisplayFromGrid()
 	      *g = GRID_KEEP;
 	      w = k - i;
 #if USE_PIXMAP_IF_COLOR
-              if(real_depth == 0)
-		{
-		  real_depth = DefaultDepth(stage.Dis, stage.Sc);
-		}
               if(real_depth != stage.depth)
 		{
 		  if(pm == 0)
@@ -1313,7 +1321,8 @@ void drawinit()
   gethostname(buf2, 256);
   if((p = index(lp->pw_gecos, ',')) != NULL)
     *p = 0;
-  LoginName = strdup(*lp->pw_gecos ? lp->pw_gecos : lp->pw_name);
+		if (options.anon) LoginName="administration";
+		else LoginName = strdup(*lp->pw_gecos ? lp->pw_gecos : lp->pw_name);
   sprintf(buf1, "Station %s parked by %s", buf2, LoginName);
 
   XDrawImageString(stage.Dis, stage.Win, stage.wonb, TEXT_XP, TEXT_YP, 
@@ -1386,9 +1395,9 @@ play_animation()
   maxlems  = 1 + LEMSPEED_BASE / i;
 
   if (options.speed < 60 || options.harmless || options.nolock)
-    printf("Lemming based %smachine speed: %d = 1 + %d / %d\n", 
+    printf("Lemming based %smachine speed: %5.2f = 1 + %d / %d\n", 
 	   stage.depth > 1 ? "color " : "",
-	   maxlems, LEMSPEED_BASE, i);
+	   1.0 + (double)LEMSPEED_BASE / (double)i, LEMSPEED_BASE, i);
 
   sprintf(buf, "%s/%s/%s", plockdir, sounddir, SND_BOXOPEN);
   if (!options.quiet)

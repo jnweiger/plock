@@ -1,15 +1,21 @@
 /*
  * plock.c
  *
- * This is version 0.1 -- beta release, use with care
+ * This is version 0.2 -- use with care
  *
  * This program is distributed in the hope that it will be usefull, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.
+ * 
+ * Distribute freely and credit us, make profit and share with us!
+ *
+ * jnweiger@immd4.informatik.uni-erlangen.de
+ * rfkoenig@immd4.informatik.uni-erlangen.de
  *
  */
-#include "sccs.h"
-SCCS_ID("@(#)plock.c	1.20 92/02/21 17:45:57 FAU");
+#include <grp.h>
+#include "rcs.h"
+RCS_ID("$Id$ FAU")
 
 #include "plock.h"
 #include "config.h"
@@ -27,13 +33,14 @@ SCCS_ID("@(#)plock.c	1.20 92/02/21 17:45:57 FAU");
 # define SEC_PER_TICK 60
 #endif
 
+int real_depth;
 struct Option options = 
 {
-  SEC_PER_TICK, 0, 0, 0, 0, 0, 0,
+  SEC_PER_TICK, 0, USE_COLOR, 0, 0, 0, 1, 0, 0
 };
   
 Colormap xmap, dmap;
-char My_Dpy[256], *LoginName = NULL;
+char *dpyname, *LoginName = NULL;
 Window rootwin;
 Cursor crs;
 static int status = 0, badlog;
@@ -42,9 +49,16 @@ XHostAddress *hosts;
 Bool hoststate;
 unsigned char empty[2] = { 0, 0 };
 
+#ifndef linux
 extern int errno;
 extern char *sys_errlist[];
-extern char *index(), *fgets();
+#endif /* linux */
+
+#ifndef index
+extern char *index();
+#endif
+
+extern char *fgets();
 void unlock();
 void lock();
 static void Init __P((void));
@@ -68,6 +82,7 @@ int dummy()
   return 0;
 }
 
+#ifndef DELETE_PROPERTY
 static int shooter(sig, what)
   int what, sig;
 {
@@ -82,8 +97,8 @@ static int shooter(sig, what)
   debug2("shooter(%d, %d)\n", sig, what);
   if (what == KILL_GENOCIDE)
     {
-      time(&i);
-      sprintf(buf, "plock GENOCIDE (%d) %s\n", sig, ctime(&i));
+      time((time_t *)&i);
+      sprintf(buf, "plock GENOCIDE (%d) %s\n", sig, ctime((time_t *)&i));
       syslog(LOG_NOTICE, buf);
       for (i = 0; i < NSIG; i++)
 	signal(i, SIG_IGN);
@@ -95,7 +110,7 @@ static int shooter(sig, what)
         if (i != mypid)
 #endif
           kill(i, SIGHUP);
-      time(&i);
+      time((time_t *)&i);
       sleep(5);
       return 0;
     }
@@ -163,10 +178,16 @@ static int shooter(sig, what)
     }
   return ret;
 }
+#endif
+
+
 
 void plock_terminate()
 {
-  int n, i, tr, fd;
+  int n, i;
+#ifdef sun
+  int tr, fd;
+#endif 
   char logbuf[256];
 
   debug1("plock_terminate %d\n", status);
@@ -183,65 +204,103 @@ void plock_terminate()
 
 #ifdef sun
 
-#ifdef COMMENT
-  Do a 'kbd_mode -a' after shooting...
+/* Do a 'kbd_mode -a' after shooting...  */
+  if(stage.islocal)
+    fd = open("/dev/kbd", O_WRONLY, 0);
 #endif
 
-  fd = open("/dev/kbd", O_WRONLY, 0);
-#endif
-
-  shooter(SIGHUP, KILL_SOME);
   sprintf(logbuf, "parklock: %s is being logged off NOW!\n", LoginName);
   syslog(LOG_NOTICE, logbuf);
-  sleep(5);
-  n = shooter(SIGTERM, KILL_SOME);
-  if(n > 0) 
+#if !defined(DELETE_PROPERTY)
+  if(stage.islocal)
     {
-      sleep(15);
-      if ((i = shooter(SIGKILL, KILL_SOME)) != 0)
+      shooter(SIGHUP, KILL_SOME);
+      sleep(5);
+      n = shooter(SIGTERM, KILL_SOME);
+      if(n > 0) 
 	{
-	  sprintf(logbuf,
-		  "parklock: WARNING: %d ignored SIGHUP. SIGKILL sent!\n", i);
-	  syslog(LOG_NOTICE, logbuf);
-	  sleep(10);
+	  sleep(15);
+	  if ((i = shooter(SIGKILL, KILL_SOME)) != 0)
+	    {
+	      sprintf(logbuf,
+		    "parklock: WARNING: %d ignored SIGHUP. SIGKILL sent!\n", i);
+	      syslog(LOG_NOTICE, logbuf);
+	      sleep(10);
+	    }
 	}
-    }
 
- /*
-  * If X is still alive, then we go Berserk.
-  */
-  if(status & LCK_HST)
-    {
-      status &= ~LCK_HST;
-      if (hosts)
-        {
-	  XAddHosts(stage.Dis, hosts, hostnr);
-	  XFree((caddr_t)hosts);
+     /*
+      * If X is still alive, then we go Berserk.
+      */
+      if(status & LCK_HST)
+	{
+	  status &= ~LCK_HST;
+	  if (hosts)
+	    {
+	      XAddHosts(stage.Dis, hosts, hostnr);
+	      XFree((caddr_t)hosts);
+	    }
+	  if(hoststate == False)
+	    XDisableAccessControl(stage.Dis);
 	}
-      if(hoststate == False)
-        XDisableAccessControl(stage.Dis);
+      hosts = XListHosts(stage.Dis, &hostnr, &hoststate);
+      debug1("Xopen %04x\n", status);
+      if(XOpenDisplay(dpyname) != NULL)
+	{
+	  sprintf(logbuf, "parklock: Lies, damned lies and %s (Sorry, %s)\n",
+		  PSPROG, LoginName);
+	  syslog(LOG_NOTICE, logbuf);
+	  shooter(SIGHUP, KILL_GENOCIDE);
+	  shooter(SIGTERM, KILL_GENOCIDE);
+	  shooter(SIGKILL, KILL_GENOCIDE);
+	}
     }
-  hosts = XListHosts(stage.Dis, &hostnr, &hoststate);
-  debug1("Xopen %04x\n", status);
-  if(XOpenDisplay(My_Dpy) != NULL)
+  else
     {
-      sprintf(logbuf, "parklock: Lies, damned lies and %s (Sorry, %s)\n",
-	      PSPROG, LoginName);
-      syslog(LOG_NOTICE, logbuf);
-      shooter(SIGHUP, KILL_GENOCIDE);
-      shooter(SIGTERM, KILL_GENOCIDE);
-      shooter(SIGKILL, KILL_GENOCIDE);
+      Window rootw, parentw, *childw;
+      int j, number = 0;
+
+      XSetErrorHandler(piper);
+      do
+	{
+	  if(!XQueryTree(stage.Dis, RootWindow(stage.Dis, 0), 
+	    &rootw, &parentw, &childw, &number))
+	      printf("Sorry..., XQueryTree failed...\n");
+	  for(j = 0; j < number; j++)
+	    if(childw[j] != stage.Win)
+	      XKillClient(stage.Dis, childw[j]);
+	  XSync(stage.Dis, False);
+	}
+      while(number > 1);
+      XCloseDisplay(stage.Dis);
     }
+#else
+  {
+    Atom prop;
+
+    if((prop = XInternAtom(stage.Dis, DELETE_PROPERTY, True)) == None)
+      {
+	fprintf(stderr,"Sorry, no atom named '%s' found...\n", DELETE_PROPERTY);
+      }
+    else
+      XDeleteProperty(stage.Dis, RootWindow(stage.Dis, 0), prop);
+  printf("Delete...\n");
+    XFlush(stage.Dis);
+  }
+#endif
   
 #ifdef sun
-  tr = TR_ASCII;
-  if (fd != -1)
+  if(stage.islocal)
     {
-      if (ioctl(fd, KIOCTRANS, (caddr_t) &tr))
-        {
-          perror("ioctl (KIOCTRANS)");
-        }
-      close(fd);
+      tr = TR_ASCII;
+      if (fd != -1)
+	{
+	  if (ioctl(fd, KIOCTRANS, (caddr_t) &tr))
+	    {
+	      perror("ioctl (KIOCTRANS)");
+	    }
+	  close(fd);
+	}
     }
 #endif
   exit(-1);
@@ -256,7 +315,7 @@ void analyse(ptr)
   struct passwd *lp;
 
   lp = getpwuid(getuid());
-  strcpy(localbuf, lp->pw_passwd);
+  strcpy(localbuf, lp ? lp->pw_passwd : "");
 
   if (options.nolock)
     {
@@ -265,11 +324,11 @@ void analyse(ptr)
   else
     {
       if (j = strcmp(crypt(ptr, localbuf), localbuf))
-       {
-         lp = getpwuid(0);
-         strcpy(localbuf, lp->pw_passwd);
-         j = strcmp(crypt(ptr, localbuf), localbuf);
-       }
+	{
+	  lp = getpwuid(0);
+	  strcpy(localbuf, lp ? lp->pw_passwd : "");
+	  j = strcmp(crypt(ptr, localbuf), localbuf);
+	}
     }
   for (i = strlen(ptr); i >= 0; i--)
     {
@@ -308,6 +367,8 @@ void free_all()
 
   if (aaarrgh++)
     abort();
+  if (options.nonoise)
+    set_bell_vol(stage.Dis, stage.beeper_volume);
   XFreeCursor(stage.Dis, crs);
 
   XFreeGC(stage.Dis, stage.wonb);
@@ -375,13 +436,19 @@ void lock()
   status |= LCK_PNT;
 
   hosts = XListHosts(stage.Dis, &hostnr, &hoststate);
+
+  XSetErrorHandler(piper);
+
+  XRemoveHosts(stage.Dis, hosts, hostnr);
   if (!hoststate)
     {
       debug("he had no access control\n");
       XEnableAccessControl(stage.Dis);
     }
-  XRemoveHosts(stage.Dis, hosts, hostnr);
   status |= LCK_HST;
+
+  XSync(stage.Dis, 0);
+  XSetErrorHandler(handler);
 
   XGetScreenSaver(stage.Dis, &ssto, &ssiv, &ssbl, &ssex);
   XSetScreenSaver(stage.Dis, 0, 0, 0, 0);
@@ -487,6 +554,40 @@ static void eat_events()
     }
 }
 
+int is_cipadm()
+{
+  struct group *grpinfo;
+  gid_t gidset[20];
+  int len, i;
+
+  if ((grpinfo = getgrnam("cipadm")) == NULL) return(0);
+
+  if ((len = getgroups(20, gidset)) == -1) return(0);
+   
+  for (i=0; i<len; i++)
+  {
+    if (gidset[i] == grpinfo->gr_gid) return(1);
+  };
+  return(0);
+}
+
+
+char *opts[] =
+{
+  "-harmless",
+  "-demo",
+  "-noanim",
+  "-nolock",
+  "-color",
+  "-mono",
+  "-quiet",
+  "-noise",
+		"-long",
+		"-super",
+		"-anon",
+  NULL 
+};
+
 
 void main(argc, argv)
   int argc;
@@ -500,64 +601,68 @@ void main(argc, argv)
   unsigned width, height;
   Pixmap pm;
   XFontStruct *fnt, *fntl;
+#ifdef sun
   struct stat st_buf;
+#endif
   XColor curcol;
   char logbuf[256];
   unsigned long pmask, pixels[256];
 
+  stage.islocal = 1;
   argv++;
   while (argc-- > 1)
     {
-      if (strcmp(*argv, "-harmless") == 0)
-        {
+      int opt;
+
+      for (opt = 0; opts[opt]; opt++)
+        if (!strcmp(*argv, opts[opt]))
+	  break;
+      switch (opt)
+	{
+	case 0: /* -harmless */
           options.harmless = 1;
 	  /*
 	   * harmless implies demo.
 	   * Thus we frustrate cheating like "plock -harmless; plock"
 	   */
-	  options.speed = 2;
-        }
-      else 
-        {
-          if (strcmp(*argv, "-demo") == 0)
-            {
-              options.speed = 2;
-            }
-          else
-            {
-              if (strcmp(*argv, "-noanim") == 0)
-                {
-                  options.noanim = 1;
-                }
-	      else
-	        {
-		  if (strcmp(*argv, "-nolock") == 0)
-		    {
-		      options.harmless = 1;
-		      options.nolock = 1;
-		    }
-		  else
-		    {
-		      if (strcmp(*argv, "-color") == 0)
-			{
-			  options.color = 1;
-			}
-		      else
-			{
-			  if (strcmp(*argv, "-quiet") == 0)
-			    {
-			      options.quiet = 1;
-			    }
-			  else
-			    {
-			      fprintf(stderr, 
-				  "Usage: plock [-demo] [-noanim] [-color]\n");
-			      exit(-1);
-			    }
-			}
-		    }
-	        }
-            }
+	  /* FALLTHROUGH */
+	case 1: /* -demo */
+          options.speed = 2;
+	  break;
+        case 2: /* -noanim */
+          options.noanim = 1;
+	  break;
+	case 3: /* -nolock */
+	  options.harmless = 1;
+	  options.nolock = 1;
+	  break;
+	case 4: /* -color */
+	  options.color = 1;
+	  break;
+	case 5: /* -mono */
+	  options.color = 0;
+	  break;
+	case 6: /* -quiet */
+	  options.quiet = 1;
+	  break;
+	case 7: /* -noise */
+	  options.nonoise = 0;
+	  break;
+	case 8: /* -long */
+			if (is_cipadm()) options.speed = 120;
+	  break;
+	case 9: /* -super */
+			if (is_cipadm()) options.speed = 180;
+	  break;
+	case 10: /* -anon */
+			if (is_cipadm()) options.anon = 1;
+	  break;
+	default:
+	  fprintf(stderr, "Usage:\n%s", "plock");
+	  for (opt = 0; opts[opt]; opt++)
+	    fprintf(stderr, " [%s]", opts[opt]);
+	  fprintf(stderr, "\n");
+	  exit(-1);
         }
       argv++;
     }
@@ -567,26 +672,24 @@ void main(argc, argv)
    */
   i = ((time(0) & 0xff) * 17) % 100;
   debug2("%d %d\n", i, time(0));
-  if (i >= ((options.speed < 60) ? 50 : 95))
+
+  if ((i >= ((options.speed < 60) ? 60 : 95)) && !getenv("NOVAC"))
     options.vacation = 1;
 
-#ifdef COMMENT
-  Allow locks only from the localhost
+#ifdef sun
+/* We can determine, if we are started local on suns (checking /dev/console) */
+  dpyname = NULL;
+#else
+  if(options.nolock)
+    dpyname = NULL;
+  else
+    dpyname = ":0.0";
 #endif
 
-  if(!options.nolock)
+  if((stage.Dis = XOpenDisplay(dpyname)) == NULL)
     {
-      gethostname(My_Dpy, 256);
-      strcat(My_Dpy, ":0.0");
-    }
-  else
-    {
-      My_Dpy[0] = 0;
-    }
-
-  if((stage.Dis = XOpenDisplay(My_Dpy)) == NULL)
-    {
-      fprintf(stderr, "Can't connect server.\n");
+      fprintf(stderr,
+      "Can't connect server.\nPlease check the DISPLAY environment variable\n");
       exit(-1);
     }
 
@@ -599,16 +702,15 @@ void main(argc, argv)
 	  exit(-1);
 	}
       if(st_buf.st_uid != getuid())
-	{
-	  fprintf(stderr, "Lock is only possible from localhost.\n");
-	  exit(-1);
-	}
+	stage.islocal = 0;
+      else
+	stage.islocal = 1;
 #endif
     }
   
-#ifdef COMMENT
-  We have to check, if ps is ok on this machine
-#endif
+  /* 
+   * We have to check, if ps is ok on this machine
+   */
 
 #ifndef DEBUG
   if (!options.nolock)
@@ -617,10 +719,10 @@ void main(argc, argv)
 #endif
   XSetErrorHandler(handler);
 
-#ifdef COMMENT
-  XSynchronize(stage.Dis, True);
-  Fontloading...
-#endif
+  /*
+   * XSynchronize(stage.Dis, True);
+   * Fontloading...
+   */
 
   if((fnt = XLoadQueryFont(stage.Dis, FONT)) == NULL)
     {
@@ -642,7 +744,7 @@ void main(argc, argv)
     }
 
   stage.Sc = DefaultScreen(stage.Dis);
-  stage.depth = DefaultDepth(stage.Dis, stage.Sc);
+  real_depth = stage.depth = DefaultDepth(stage.Dis, stage.Sc);
   rootwin = RootWindow(stage.Dis, stage.Sc);
   width = DisplayWidth(stage.Dis, stage.Sc);
   height = DisplayHeight(stage.Dis, stage.Sc);
@@ -704,12 +806,16 @@ void main(argc, argv)
       stage.red = stage.white;
       stage.vis = DefaultVisual(stage.Dis, stage.Sc);
     }
+  xswa.border_pixel = stage.white;
+
 
   stage.Win = XCreateWindow(stage.Dis, rootwin, 
                       0, 0, width, height, 0, CopyFromParent,
-                      InputOutput, CopyFromParent,
+                      InputOutput, 
+		      (options.color && stage.depth > 1) ? 
+		                                    stage.vis : CopyFromParent,
                       CWEventMask | CWCursor | CWBackPixel | 
-		      CWBackingStore |
+		      CWBackingStore | CWBorderPixel |
 		      ((options.color && stage.depth > 1) ? CWColormap : 0) | 
 		      (options.nolock ? 0 : CWOverrideRedirect) ,
                       &xswa);
@@ -765,6 +871,8 @@ void main(argc, argv)
 	  UpdateWorkFromBack();
           mu(1000 * options.speed, MU_BLOCK);
 	}
+      if (options.nonoise)
+	set_bell_vol(stage.Dis, 0);
       if (options.speed >= 60 && stage.ticks->frame == 5)
 	{
 	  /* as soon as the hand hits the zero... */
@@ -781,6 +889,8 @@ void main(argc, argv)
 
   if (!options.noanim)
     {
+      if (options.nonoise)
+	set_bell_vol(stage.Dis, stage.beeper_volume);
       play_animation();
     }
   if (options.harmless)
@@ -793,6 +903,11 @@ static void Init()
 {
   XEvent  event;
 
+  if (options.nonoise)
+    {
+      stage.beeper_volume = get_bell_vol(stage.Dis);
+      set_bell_vol(stage.Dis, 0);
+    }
   if (initstage() != 0)
     free_all();
 

@@ -1,11 +1,11 @@
 /*
  * explode.c -- plock lemming explosion.
- * this code assumes, that there is a rectangle of interesting graphics
+ * This code assumes, that there is a rectangle of interesting graphics
  * (like a lemming carrying a bomb on bloody red background) that should be
  * splashed across the screen.
  */
-#include "sccs.h"
-SCCS_ID("@(#)explode.c	1.5 92/02/21 17:45:53 FAU");
+#include "rcs.h"
+RCS_ID("$Id$ FAU");
 
 #include "plock.h"
 

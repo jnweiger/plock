@@ -13,12 +13,20 @@
 #include <sys/wait.h>
 #include <syslog.h>
 #include "ras.h"
+
 #ifdef __GNUC__
-#define __P(s) s
-#include "sun_stdlib.h"
+# define __P(s) s
+# ifdef sun
+#  include "sun_stdlib.h"
+# endif
 #else
-#define __P(s) ()
+# define __P(s) ()
 #endif
+
+#ifdef linux
+#define syslog(a,b)
+#define MAXPID 32767
+#endif /* linux */
 
 #include <sys/param.h>
 #define Free(a) {if ((a) == 0) abort(); else free((void *)(a)); (a)=0;}
@@ -35,7 +43,7 @@
 
 #define USE_PIXMAP_IF_COLOR 1
 
-#define DEFAULT_PLOCKDIR	"/local/X11/lib/plock"
+#define DEFAULT_PLOCKDIR	"/local/X11R5/lib/plock"
 
 #define DEFAULT_PLOCK_SOUNDS    "sound"
 #define SND_OHNO                "oh_no.snd"
@@ -84,7 +92,9 @@ struct Option
   int noanim;
   int nolock;
   int quiet;
+  int nonoise;
   int vacation;
+		int anon;
 };
   
 struct anim
@@ -150,6 +160,7 @@ struct _stage
   Window Win;
   Visual *vis;
   int Sc;
+  int islocal;
   unsigned long white, black, red; 
   GC bonw, wonb, bonwl;
   XImage *Back, *Work, *Clock, *Scale;
@@ -160,6 +171,7 @@ struct _stage
   struct movement *vac_top, *vac_bot, *ticks, *box_top, *box_in, *box_open;
   int nlems;
   int release_rate;
+  int beeper_volume;
   struct lem_move *lem;
 };
 
@@ -193,3 +205,5 @@ extern int expl_init __P((int, int, int, int, int));
 extern int explode __P((void));
 extern int PlaySound __P((char *, int));
 extern int WaitSoundPlayed __P((void));
+extern int get_bell_vol __P((Display *));
+extern void set_bell_vol __P((Display *, int));
