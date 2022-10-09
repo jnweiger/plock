@@ -5,7 +5,7 @@
  * splashed across the screen.
  */
 #include "rcs.h"
-RCS_ID("$Id$ FAU");
+RCS_ID("$Id$ FAU")
 
 #include "plock.h"
 
@@ -18,7 +18,11 @@ RCS_ID("$Id$ FAU");
 #define HSIZE(e)	((e)->size)
 #define VSIZE(e)	((e)->size >> 1)
 
+#ifdef SOLARIS
+#define assert(a) { if (!(a)) { printf("assert,  l.%d\n", __LINE__); abort();}}
+#else
 #define assert(a) { if (!(a)) { printf("%s (%d)\n", "a", __LINE__); abort();}}
+#endif
 
 struct particle
 {

@@ -4,7 +4,7 @@
  * jw 14.1.1992
  */
 #include "rcs.h"
-RCS_ID("$Id$ FAU");
+RCS_ID("$Id$ FAU")
 
 
 #include "plock.h"
@@ -541,9 +541,9 @@ int x1, y1, x2, y2, val;
 {
   int i, j, k;
 
-  /*
-  printf("SetGrid(%d, %d, %d, %d,  %d);\n", x1, y1, x2, y2, val);
-  */
+  debug2("SetGrid(%d, %d, ", x1, y1);
+  debug2("%d, %d,  ", x2, y2);
+  debug1("%d);\n", val);
   k = stage.grid_w;
   if (x1 < 0)
     x1 = 0;

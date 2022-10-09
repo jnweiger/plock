@@ -1,7 +1,7 @@
 /*
  * plock.c
  *
- * This is version 0.2 -- use with care
+ * This is version 0.3 -- use with care
  *
  * This program is distributed in the hope that it will be usefull, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -17,6 +17,10 @@
 #include "rcs.h"
 RCS_ID("$Id$ FAU")
 
+#ifdef SOLARIS
+#include <crypt.h>
+#include <sys/stat.h>
+#endif
 #include "plock.h"
 #include "config.h"
 
@@ -306,45 +310,61 @@ void plock_terminate()
   exit(-1);
 }
 
+/*
+ * call getpwuid(), if that reveals an invalid string, try
+ * again with getspnam(). If one of these calls fails, return -1 and the
+ * invalid password "::" is copied to *ptr.
+ * otherwise 0 is returned and the crypted password is copied
+ * into *ptr. You have to define SHADOWPW, to include the getspnam() test.
+ */
+#ifdef SHADOWPW
+# include <shadow.h>
+#endif /* SHADOWPW */
 
-void analyse(ptr)
-  char *ptr;
+int
+LookupPassword(uid, ptr)
+int uid;
+char *ptr;
 {
-  int i, j;
-  char localbuf[256];
-  struct passwd *lp;
+  struct passwd *ppp;
+  int i, c;
 
-  lp = getpwuid(getuid());
-  strcpy(localbuf, lp ? lp->pw_passwd : "");
-
-  if (options.nolock)
+  *ptr = '\0';
+  if (!(ppp = getpwuid(uid)))
     {
-      j = strcmp("nolock", ptr);
+      strcpy(ptr, "::");
+      return -1;
     }
-  else
+  for (i = 0; i < 13; i++)
     {
-      if (j = strcmp(crypt(ptr, localbuf), localbuf))
-	{
-	  lp = getpwuid(0);
-	  strcpy(localbuf, lp ? lp->pw_passwd : "");
-	  j = strcmp(crypt(ptr, localbuf), localbuf);
+      c = ppp->pw_passwd[i];
+      if (!(c == '.' || c == '/' ||
+            (c >= '0' && c <= '9') ||
+            (c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z')))
+        break;
+    }
+  if (i < 13)
+    {
+#ifdef SHADOWPW
+      struct spwd *sss;
+
+      if ((sss = getspnam(ppp->pw_name)))
+        {
+	  strcpy(ptr, sss->sp_pwdp);
+	  debug1("shadow: %s\n", ptr);
+	  return 0;
+	}
+      else
+#endif
+        {
+	  strcpy(ptr, "::");
+	  return -1;
 	}
     }
-  for (i = strlen(ptr); i >= 0; i--)
-    {
-      ptr[i] = 0;
-    }
-  if (j)
-    {
-      XDrawImageString(stage.Dis, stage.Win, stage.wonb, TEXT_XP, TEXT_YP+60,
-                       "Login failed, try again.", 24);
-      XSync(stage.Dis, False);
-      badlog = 1;
-    }
-  else
-    {
-      free_all();
-    }
+  strcpy(ptr, ppp->pw_passwd);
+  debug1("%s\n", ptr);
+  return 0;
 }
 
 int handler(dis, ev)
@@ -489,6 +509,52 @@ unlock()
     }
 }
 
+static char root_password[30];
+static char user_password[30];
+
+void analyse(ptr)
+  char *ptr;
+{
+  int i, j, c;
+  char localbuf[256];
+
+  if (options.nolock)
+    {
+      j = strcmp("nolock", ptr);
+      if (j)
+        syslog(LOG_NOTICE, "-nolock: he should have entered \"nolock\" as password.");
+    }
+  else
+    {
+      if (!*user_password)
+	LookupPassword(getuid(), user_password);
+      if (j = strcmp(crypt(ptr, user_password), user_password))
+	{
+	  if (!*root_password)
+	    LookupPassword(0, root_password);
+	  j = strcmp(crypt(ptr, root_password), root_password);
+	}
+    }
+  for (i = strlen(ptr); i >= 0; i--)
+    ptr[i] = 0;
+  for (i = strlen(user_password); i >= 0; i--)
+    user_password[i] = 0;
+  for (i = strlen(root_password); i >= 0; i--)
+    root_password[i] = 0;
+
+  if (j)
+    {
+      XDrawImageString(stage.Dis, stage.Win, stage.wonb, TEXT_XP, TEXT_YP+60,
+                       "Login failed, try again.", 24);
+      XSync(stage.Dis, False);
+      badlog = 1;
+    }
+  else
+    {
+      free_all();
+    }
+}
+
 #define MBUFLEN 1024
 static void eat_events()
 {
@@ -608,6 +674,15 @@ void main(argc, argv)
   char logbuf[256];
   unsigned long pmask, pixels[256];
 
+  root_password[0] = user_password[0] = '\0';
+  if (!geteuid() && getuid())
+    {
+      LookupPassword(0, root_password);
+      LookupPassword(getuid(), user_password);
+      seteuid(getuid());
+      setegid(getgid());
+    }
+
   stage.islocal = 1;
   argv++;
   while (argc-- > 1)
@@ -707,11 +782,15 @@ void main(argc, argv)
 	stage.islocal = 1;
 #endif
     }
+
+  openlog("plock", LOG_PID, LOG_USER);
+  /*
+  syslog(LOG_NOTICE, "testing syslog");
+  */
   
   /* 
    * We have to check, if ps is ok on this machine
    */
-
 #ifndef DEBUG
   if (!options.nolock)
     for(i = 0; i < NSIG; i++)

@@ -2,7 +2,7 @@
  * snd.c -- plock plays sound nonblocking on a sparc
  */
 #include "rcs.h"
-RCS_ID("$Id$ FAU");
+RCS_ID("$Id$ FAU")
 
 #include "plock.h"
 
@@ -10,7 +10,11 @@ RCS_ID("$Id$ FAU");
 # include <fcntl.h>
 # include <sys/ioctl.h>
 # include <sys/file.h>
+#ifdef SOLARIS
+# include <sys/audioio.h>
+#else
 # include <sun/audioio.h>
+#endif
 
 # define	AUDIO_IODEV	"/dev/audio"
 # define	DEFAULT_GAIN		40

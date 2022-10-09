@@ -1,10 +1,9 @@
 /*
  * XLoadRaster.c -- plock loads rasterfiles
  *
-
  */
 #include "rcs.h"
-RCS_ID("$Id$ FAU");
+RCS_ID("$Id$ FAU")
 
 #include <X11/Xlib.h>
 #include <sys/errno.h>
@@ -14,7 +13,7 @@ RCS_ID("$Id$ FAU");
 
 extern int errno;
 
-#ifndef __GNUC__
+#if !defined(__GNUC__) && !defined(SOLARIS)
 # ifdef sun
     extern int free();
     extern char *malloc();
@@ -47,7 +46,11 @@ static void my_free(cm, d)
     }
 }
 
+#ifdef LOADDEBUG
 #define GETC(c, fp) if((c=getc(fp)) == EOF) {errno=EINVAL; debug("GETC\n"); my_free(cmap, data); return NULL;} 
+#else
+#define GETC(c, fp) if((c=getc(fp)) == EOF) {errno=EINVAL; my_free(cmap, data); return NULL;} 
+#endif
 
 static unsigned int shifts[8] = 
 {
@@ -177,7 +180,9 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
     }
   else
     {
+#ifdef LOADDEBUG
       debug("BYTE_ENCODED\n");
+#endif
       dp = data;
       j = bpl2 = ((rf.ras_depth == 1 ? (rf.ras_width + 7) / 8 : rf.ras_width) + 1) & ~1;
       i = rf.ras_height;
@@ -194,7 +199,9 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
 	      if (c == RAS_ESC)
 		{
 		  GETC(k, fp);
+#ifdef LOADDEBUG
 		  debug1("RAS_ESC, k=%d\n", k);
+#endif
 		  if (k != 0)
 		    {
 		      count += k;

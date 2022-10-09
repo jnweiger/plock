@@ -2,7 +2,7 @@
  * image.c -- plock image manipulation for lemmings
  */
 #include "rcs.h"
-RCS_ID("$Id$ FAU");
+RCS_ID("$Id$ FAU")
 
 #define SLOW_COPY 0
 
@@ -340,6 +340,7 @@ char *grid;
       c = 0;
       break;
     default:
+      debug1("image depth %d ??\n", im->depth);
       abort();
     }
 

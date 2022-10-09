@@ -1,6 +1,23 @@
 #define USE_COLOR 1
 
 #ifdef sun
+# ifdef SOLARIS
+
+/* leftmost column is OFFSET 0 */
+#define PSPROG "/bin/ps"
+#define PSARGS "-le"
+#define PS_UID_OFFSET  4
+#define PS_PID_OFFSET 10
+#define PS_TTY_OFFSET 58
+#define PS_AV0_OFFSET 72
+
+#define FONT "-*-lucida-medium-r-*-sans-24-*-*-*-*-*-*-*"
+#define FONTL "-*-lucida-bold-r-*-sans-14-*-*-*-*-*-*-*"
+
+#include <sys/kbd.h>
+#include <sys/kbio.h>
+
+# else
 
 #define PSPROG "/bin/ps"
 #define PSARGS "-lx"
@@ -15,6 +32,7 @@
 #include <sundev/kbd.h>
 #include <sundev/kbio.h>
 
+# endif
 #endif
 
 #ifdef hpux

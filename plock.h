@@ -12,6 +12,7 @@
 #include <sys/time.h>
 #include <sys/wait.h>
 #include <syslog.h>
+#include <fcntl.h>
 #include "ras.h"
 
 #ifdef __GNUC__
@@ -21,6 +22,12 @@
 # endif
 #else
 # define __P(s) ()
+#endif
+
+#ifdef SOLARIS
+# define bcopy(a,b,c)    (memcpy(b,a,c))
+# define bzero(a,b)      (memset(a,0,b))
+# define index(a,b)      (strchr(a,b))
 #endif
 
 #ifdef linux
