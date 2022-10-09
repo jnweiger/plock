@@ -16,9 +16,11 @@
 #include "ras.h"
 
 #ifdef __GNUC__
-# define __P(s) s
 # ifdef sun
 #  include "sun_stdlib.h"
+# define __P(s) s
+# endif
+# ifdef linux
 # endif
 #else
 # define __P(s) ()
@@ -50,7 +52,7 @@
 
 #define USE_PIXMAP_IF_COLOR 1
 
-#define DEFAULT_PLOCKDIR	"/local/X11R5/lib/plock"
+#define DEFAULT_PLOCKDIR	"/home/tsgebert/projects/plock/plock-0.3/rasterfiles"
 
 #define DEFAULT_PLOCK_SOUNDS    "sound"
 #define SND_OHNO                "oh_no.snd"
@@ -183,11 +185,13 @@ struct _stage
 };
 
 extern time_t time();
+typedef void (*sighandler_t)(int);
 
 extern struct _stage stage;
 extern struct Option options;
 extern char *LoginName;
-extern void free_all __P((void));
+extern sighandler_t free_allsig __P((int,sighandler_t));
+extern void free_all __P(());
 extern int DrawFrameGrid __P((struct movement *, char *));
 extern int EraseFrameGrid __P((struct movement *, char *));
 extern int UpdateDisplayFromGrid __P((void));
@@ -207,7 +211,7 @@ extern int initgraphics __P((void));
 extern int mu __P((int, int));
 extern XImage *XLoadRasterfile __P((Display *, Visual *, FILE *, colormap_t *, int));
 extern int Image1to8 __P((XImage **, int));
-extern int gettimeofday __P((struct timeval *, struct timezone *tzp));
+//extern int gettimeofday __P((struct timeval *, struct timezone *tzp));
 extern int expl_init __P((int, int, int, int, int));
 extern int explode __P((void));
 extern int PlaySound __P((char *, int));

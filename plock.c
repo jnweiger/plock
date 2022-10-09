@@ -1,7 +1,7 @@
 /*
  * plock.c
  *
- * This is version 0.3 -- use with care
+ * This is version 0.4 -- use with care
  *
  * This program is distributed in the hope that it will be usefull, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -21,6 +21,18 @@ RCS_ID("$Id$ FAU")
 #include <crypt.h>
 #include <sys/stat.h>
 #endif
+
+#ifdef linux
+#define XLIB_ILLEGAL_ACCESS 1
+#include <sys/types.h>
+#include <unistd.h>
+#include <time.h>
+#include <errno.h>
+#include <signal.h>
+#include <crypt.h>
+#include <X11/Xlib.h>
+#endif
+
 #include "plock.h"
 #include "config.h"
 
@@ -74,6 +86,11 @@ void waiter()
  int s;
 
  wait(&s);
+}
+
+int xerrhandler()
+{
+  return(0);
 }
 
 void piper()
@@ -262,9 +279,10 @@ void plock_terminate()
   else
     {
       Window rootw, parentw, *childw;
-      int j, number = 0;
+      int j;
+      unsigned int number = 0;
 
-      XSetErrorHandler(piper);
+      XSetErrorHandler(xerrhandler);
       do
 	{
 	  if(!XQueryTree(stage.Dis, RootWindow(stage.Dis, 0), 
@@ -376,6 +394,49 @@ int handler(dis, ev)
   unlock();
   return 0;
 }
+typedef void (*sighandler_t)(int);
+
+sighandler_t free_allsig_(int i, sighandler_t handler)
+{
+  static int aaarrgh = 0;
+  debug("free_all\n");
+  unlock();
+  if (LoginName)
+    free(LoginName);
+
+  if (aaarrgh++)
+    abort();
+  if (options.nonoise)
+    set_bell_vol(stage.Dis, stage.beeper_volume);
+  XFreeCursor(stage.Dis, crs);
+
+  XFreeGC(stage.Dis, stage.wonb);
+  XFreeGC(stage.Dis, stage.bonw);
+  XFreeGC(stage.Dis, stage.bonwl);
+  if (stage.Clock)
+    XDestroyImage(stage.Clock);
+  if (stage.Scale)
+    XDestroyImage(stage.Scale);
+  if (stage.Work)
+    XDestroyImage(stage.Work);
+  if (stage.Back)
+    XDestroyImage(stage.Back);
+  if (stage.ticks)
+    DestroyMovement(stage.ticks);
+  if (stage.box_in)
+    DestroyMovement(stage.box_in);
+  if (stage.box_open)
+    DestroyMovement(stage.box_open);
+  if (stage.vac_top)
+    DestroyMovement(stage.vac_top);
+  if (stage.vac_bot)
+    DestroyMovement(stage.vac_bot);
+  /*
+   destroy LEMMING 
+   */
+  XCloseDisplay(stage.Dis);
+  exit(0);
+}
 
 void free_all()
 {
@@ -457,7 +518,7 @@ void lock()
 
   hosts = XListHosts(stage.Dis, &hostnr, &hoststate);
 
-  XSetErrorHandler(piper);
+  XSetErrorHandler(xerrhandler);
 
   XRemoveHosts(stage.Dis, hosts, hostnr);
   if (!hoststate)
@@ -515,8 +576,9 @@ static char user_password[30];
 void analyse(ptr)
   char *ptr;
 {
-  int i, j, c;
-  char localbuf[256];
+  int i, j;
+  //int c;
+  //char localbuf[256];
 
   if (options.nolock)
     {
@@ -528,7 +590,7 @@ void analyse(ptr)
     {
       if (!*user_password)
 	LookupPassword(getuid(), user_password);
-      if (j = strcmp(crypt(ptr, user_password), user_password))
+      if ((j = strcmp(crypt(ptr, user_password), user_password)))
 	{
 	  if (!*root_password)
 	    LookupPassword(0, root_password);
@@ -563,7 +625,7 @@ static void eat_events()
   XEvent  event;
   KeySym  key;
   int i;
-
+  i=0;
   while (XPending(stage.Dis))
     {
       XNextEvent(stage.Dis, &event);
@@ -599,7 +661,7 @@ static void eat_events()
 	    else 
 	      if(key >= XK_space && key <= XK_asciitilde)
 	        {
-		  if(ptr < buf + MBUFLEN - 1);
+		  if(ptr < buf + MBUFLEN - 1)
 		    {
 		      *ptr++ = text[0];
 		    }
@@ -655,7 +717,7 @@ char *opts[] =
 };
 
 
-void main(argc, argv)
+int main(argc, argv)
   int argc;
   char **argv;
 {
@@ -868,7 +930,7 @@ void main(argc, argv)
 		 vinfo.colormap_size))
 	{
 	  printf("Can't get enough colors!\n");
-	  return;
+	  //return 0;
 	}
       xswa.colormap = xmap;
     }

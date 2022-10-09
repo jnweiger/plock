@@ -5,8 +5,8 @@
 SPEED=60
 
 CC = gcc
-CFLAGS = -O6 -Wall -pipe -I/local/X11R5/include -DSEC_PER_TICK=$(SPEED)
-X11LIB = -L/local/X11R5/lib -lX11 
+CFLAGS = -O6 -Wall -pipe -I/usr/include/X11 -DSEC_PER_TICK=$(SPEED)
+X11LIB = -L/usr/lib/X11 -lX11 -lcrypt
 LDFLAGS = #-static
 
 OBJS = plock.o anim.o image.o XLoadRaster.o explode.o snd.o
