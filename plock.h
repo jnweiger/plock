@@ -52,7 +52,7 @@
 
 #define USE_PIXMAP_IF_COLOR 1
 
-#define DEFAULT_PLOCKDIR	"/home/tsgebert/projects/plock/plock-0.3/rasterfiles"
+#define DEFAULT_PLOCKDIR	"./rasterfiles"
 
 #define DEFAULT_PLOCK_SOUNDS    "sound"
 #define SND_OHNO                "oh_no.snd"

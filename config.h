@@ -53,7 +53,7 @@
 
 #endif
 
-#ifdef linux
+#ifdef linux_1990
 
 #define PSPROG "/usr/bin/ps"
 #define PSARGS "-lx"
@@ -64,6 +64,20 @@
 #define X_NOT_ON_CONSOLE
 #define FONT "-*-lucida-medium-r-*-sans-24-*-*-*-*-*-*-*"
 #define FONTL "-*-lucida-bold-r-*-sans-14-*-*-*-*-*-*-*"
+
+#endif
+
+#ifdef linux
+
+#define PSPROG "/usr/bin/ps"
+#define PSARGS "-lx"
+#define PS_UID_OFFSET 2
+#define PS_PID_OFFSET 8
+#define PS_TTY_OFFSET 58
+#define PS_AV0_OFFSET 74
+#define X_NOT_ON_CONSOLE
+#define FONT "-*-fixed-medium-r-normal--24-*-*-*-*-*-iso8859-1"
+#define FONTL "-*-fixed-medium-r-normal--14-*-*-*-*-*-iso8859-1"
 
 #endif
 
