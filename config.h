@@ -53,7 +53,7 @@
 
 #endif
 
-#ifdef linux_1990
+#ifdef linux_1990	// what we used back in the days...
 
 #define PSPROG "/usr/bin/ps"
 #define PSARGS "-lx"
@@ -67,7 +67,7 @@
 
 #endif
 
-#ifdef linux
+#ifdef linux	// what we use in 2022
 
 #define PSPROG "/usr/bin/ps"
 #define PSARGS "-lx"

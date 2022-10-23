@@ -1,11 +1,15 @@
+all: loadras
 
-all:
+sound:
 	cc     play_plock.c   -o play_plock -l asound
 	./play_plock < ../rasterfiles/sound/new_level.snd
 	./play_plock < ../rasterfiles/sound/open_the_box.snd
 	./play_plock < ../rasterfiles/sound/lets_go.snd
 	./play_plock < ../rasterfiles/sound/oh_no.snd
 	./play_plock < ../rasterfiles/sound/explode.snd
+
+loadras: ../XLoadRaster.o loadras.c
+	cc     loadras.c  ../XLoadRaster.o -o loadras -lX11
 
 l1_list: l1_list.c
 	cc     l1_list.c   -o l1_list -lasound
@@ -18,3 +22,4 @@ l4_rec: l4_rec.c
 
 clean:
 	rm -f l1_list l2_open l3_play l4_rec
+	rm -f loadras play_plock
