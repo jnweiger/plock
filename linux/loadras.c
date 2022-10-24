@@ -26,8 +26,6 @@ Colormap xmap, dmap;
 char *dpyname, *LoginName = NULL;
 Window rootwin;
 Cursor crs;
-static int status = 0, badlog;
-static int hostnr, ssto, ssiv, ssbl, ssex, pipe_fd[2];
 XHostAddress *hosts;
 Bool hoststate;
 unsigned char empty[2] = { 0, 0 };
@@ -143,6 +141,8 @@ int main(int argc, char **argv)
   curcol.pixel = stage.black;
   /* "empty" cursor */
 
-  printf("dummy main\n");
+  XImage *im = LoadImageFromRasterfile(stage.Dis, stage.Sc, argv[1]);
+
+  printf("dummy main, real_depth=%d\n", real_depth);
   return 0;
 }

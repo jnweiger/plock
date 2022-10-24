@@ -9,7 +9,7 @@ sound:
 	./play_plock < ../rasterfiles/sound/explode.snd
 
 loadras: ../XLoadRaster.o loadras.c
-	cc     loadras.c  ../XLoadRaster.o -o loadras -lX11
+	cc -g -O0 loadras.c  ../XLoadRaster.c -o loadras -lX11
 
 l1_list: l1_list.c
 	cc     l1_list.c   -o l1_list -lasound

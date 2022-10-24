@@ -8,6 +8,7 @@ RCS_ID("$Id$ FAU")
 #include <X11/Xlib.h>
 #include <sys/errno.h>
 #include <stdio.h>
+#include <arpa/inet.h>	// ntohl()
 #include "plock.h"
 #include "ras.h"
 
@@ -114,11 +115,27 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
   int i, j, k, l, c = 0, bpl, bpl2, count;
   char *data = 0, *dp;
 
-  if(!fread((char *)&rf, sizeof(rf), 1, fp) || rf.ras_magic != RAS_MAGIC)
+  if(!fread((char *)&rf, sizeof(rf), 1, fp))
+    {
+      debug(" fread failed\n");
+      errno = EINVAL; return NULL;
+    }
+
+  rf.ras_magic  = ntohl(rf.ras_magic);
+  rf.ras_width  = ntohl(rf.ras_width);
+  rf.ras_height = ntohl(rf.ras_height);
+  rf.ras_depth  = ntohl(rf.ras_depth);
+  rf.ras_length = ntohl(rf.ras_length);
+  rf.ras_type   = ntohl(rf.ras_type);
+  rf.ras_maptype   = ntohl(rf.ras_maptype);
+  rf.ras_maplength = ntohl(rf.ras_maplength);
+
+  if(rf.ras_magic != RAS_MAGIC)
     {
       debug(" != RAS_MAGIC\n");
       errno = EINVAL; return NULL;
     }
+
   if(! (rf.ras_type == RT_STANDARD || rf.ras_type == RT_BYTE_ENCODED) ||
      ! (rf.ras_depth == 1 || rf.ras_depth == 8) ||
      ! (rf.ras_maptype == RMT_NONE || rf.ras_maptype == RMT_EQUAL_RGB) ||
@@ -161,6 +178,8 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
 	  return NULL;
 	}
     }
+
+# FIXME: Check all code for ntoh*() -- x86_64 is little endian -- those old sparcs an mips were big endian.
 
   if(rf.ras_type == RT_STANDARD)
     {
