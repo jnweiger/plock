@@ -1,3 +1,5 @@
+#include <assert.h>
+
 // from plock.c
 
 #include <X11/Xlib.h>
@@ -142,7 +144,10 @@ int main(int argc, char **argv)
   /* "empty" cursor */
 
   XImage *im = LoadImageFromRasterfile(stage.Dis, stage.Sc, argv[1]);
+  if (im->depth == 1)
+    Image1to8(&im, PADDING);	// huch, this converts to 24 bits per pixel.
 
   printf("dummy main, real_depth=%d\n", real_depth);
+  printf("Image size: w=%d h=%d, depth=%d, bits_per_pixel=%d\n", im->width, im->height, im->depth, im->bits_per_pixel);
   return 0;
 }

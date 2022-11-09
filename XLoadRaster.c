@@ -9,6 +9,7 @@ RCS_ID("$Id$ FAU")
 #include <sys/errno.h>
 #include <stdio.h>
 #include <arpa/inet.h>	// ntohl()
+#include <assert.h>	// don't use Image1to8() with stage.depth == 24
 #include "plock.h"
 #include "ras.h"
 
@@ -64,10 +65,12 @@ Image1to8(imp, bitmap_pad)
 XImage **imp;
 int bitmap_pad;
 {
+  // This accesses global stage.depth, stage.black, stage.white
   XImage *im, *new_im;
   int i, j, new_bpl;
   char *new_data, *p, *q;
 
+  assert(stage.depth == 8);
   im = *imp;
   if (stage.depth == 1 || im->depth == 8)
     return 0;
@@ -178,8 +181,6 @@ XLoadRasterfile(dis, vis, fp, cmap, bitmap_pad)
 	  return NULL;
 	}
     }
-
-# FIXME: Check all code for ntoh*() -- x86_64 is little endian -- those old sparcs an mips were big endian.
 
   if(rf.ras_type == RT_STANDARD)
     {
