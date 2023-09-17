@@ -1,4 +1,6 @@
 #include <assert.h>
+#include <X11/Xutil.h>
+#include <X11/keysym.h> // Include this for key symbols
 
 // from plock.c
 
@@ -147,7 +149,55 @@ int main(int argc, char **argv)
   if (im->depth == 1)
     Image1to8(&im, PADDING);	// huch, this converts to 24 bits per pixel.
 
-  printf("dummy main, real_depth=%d\n", real_depth);
-  printf("Image size: w=%d h=%d, depth=%d, bits_per_pixel=%d\n", im->width, im->height, im->depth, im->bits_per_pixel);
+  printf("dummy main, stage.depth = %d\n", real_depth);
+  printf("Image size: w=%d h=%d, im->depth=%d, im->bits_per_pixel=%d\n", im->width, im->height, im->depth, im->bits_per_pixel);
+
+  // Create a window
+#define WIN_HEIGHT 600
+#define WIN_WIDTH 800
+  Window window = XCreateSimpleWindow(stage.Dis, rootwin, 0, 0, WIN_WIDTH, WIN_HEIGHT, 1, stage.black, stage.white);
+
+  XSelectInput(stage.Dis, window, ExposureMask);
+  XMapWindow(stage.Dis, window);
+  // Wait for the MapNotify event
+  XEvent event;
+  do {
+     XNextEvent(stage.Dis, &event);
+  } while (event.type != MapNotify);
+
+  // Create an X pixmap and draw the XImage onto it
+  Pixmap pixmap = XCreatePixmap(stage.Dis, window, WIN_WIDTH, WIN_HEIGHT, real_depth);
+  GC gc = DefaultGC(stage.Dis, stage.Sc);
+  XPutImage(stage.Dis, pixmap, gc, im, 0, 0, 0, 0, im->width, im->height);
+
+  // Draw the pixmap onto the window
+  XCopyArea(stage.Dis, pixmap, window, gc, 0, 0, im->width, im->height, 0, 0);
+
+  // Flush the display to ensure changes are visible
+  XFlush(stage.Dis);
+
+  // Event loop to handle window events (e.g., expose events)
+  while (1)
+    {
+      XNextEvent(stage.Dis, &event);
+      if (event.type == Expose)
+        {
+          // Redraw the pixmap on expose events
+          XCopyArea(stage.Dis, pixmap, window, gc, 0, 0, im->width, im->height, 0, 0);
+          XFlush(stage.Dis);
+        }
+      else if (event.type == KeyPress)
+	{
+	  KeySym keySym = XLookupKeysym(&event.xkey, 0);
+	  if (keySym == XK_q)	// 'q' exits the loop.
+	    break;
+	}
+    }
+
+  // Clean up
+  XDestroyImage(im);
+  XFreePixmap(stage.Dis, pixmap);
+  XCloseDisplay(stage.Dis);
+
   return 0;
 }

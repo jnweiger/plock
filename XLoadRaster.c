@@ -70,6 +70,7 @@ int bitmap_pad;
   int i, j, new_bpl;
   char *new_data, *p, *q;
 
+  printf("Image1to8: stage.depth = %d\n", stage.depth);
   assert(stage.depth == 8);
   im = *imp;
   if (stage.depth == 1 || im->depth == 8)
