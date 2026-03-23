@@ -1,3 +1,10 @@
+#
+# Debian Requires:
+#   	apt install libasound2-dev
+#
+# Suse Requires:
+#	zypper install alsa-devel
+#
 all: loadras
 
 sound:

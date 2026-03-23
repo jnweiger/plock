@@ -51,12 +51,17 @@ int read_au_header(int fd, au_header *au)
       return -1;
     }
 
+  uint32_t samples_sec = au->samples_sec;
+  // if (samples_sec == 8012) au->samples_sec = 8000;	// maybe helps to avoid resampling (to obsolete plughw)
+
 #if DEBUG == 1
   printf("Magic .snd   %08x\n", au->magic);
   printf("Data offset  %d\n", au->data_offset);
   printf("data size    %d\n", au->data_size);
   printf("Encoding:    %d (1= 8-bit G7.11 u-law, 2=8-bit-linear PCM, 3=16bit linear pcm, ... 27 = 8-bit G.711 A-law\n", au->encoding);
   printf("Samples/sec: %d \n", au->samples_sec);
+  if (au->samples_sec != samples_sec)
+  printf("        was: %d \n", samples_sec);
   printf("Channels:    %d \n", au->channels);
 #endif
 
@@ -84,8 +89,7 @@ int main() {
   char *buffer;
 
   /* Open PCM device for playback. */
-  rc = snd_pcm_open(&handle, "default",
-                    SND_PCM_STREAM_PLAYBACK, 0);
+  rc = snd_pcm_open(&handle, "plug:default", SND_PCM_STREAM_PLAYBACK, 0);		// "default" causes invalid argument. Route it through plughw
   if (rc < 0) {
     fprintf(stderr,
             "unable to open pcm device: %s\n",
@@ -102,8 +106,8 @@ int main() {
   /* Set the desired hardware parameters. */
 
   /* Interleaved mode, no, as we only have one channel */
-  snd_pcm_hw_params_set_access(handle, params,
-                      SND_PCM_ACCESS_RW_NONINTERLEAVED);
+  snd_pcm_hw_params_set_access(handle, params, SND_PCM_ACCESS_RW_NONINTERLEAVED);	// sufficient, whenn we use snd_pcm_writen() below...
+  // snd_pcm_hw_params_set_access(handle, params, SND_PCM_ACCESS_RW_INTERLEAVED);		// required for using snd_pcm_writei()
 
   struct au_header au;
   int bytes_to_read = read_au_header(0, &au);
@@ -161,7 +165,7 @@ int main() {
         bytes_to_read = 0;
       }
 
-#if DEBUG == 1
+#if DEBUG > 1
     printf("read(%d) remaining %d\n", size_wanted, bytes_to_read);
 #endif
     rc = read(0, buffer, size_wanted);
@@ -172,7 +176,9 @@ int main() {
       fprintf(stderr,
               "short read: read %d bytes, (expected %d)\n", rc, size_wanted);
     }
-    rc = snd_pcm_writei(handle, buffer, frames_wanted);
+	void *bufs[1] = { buffer };
+	rc = snd_pcm_writen(handle, bufs, frames_wanted);
+    // rc = snd_pcm_writei(handle, buffer, frames_wanted);
     if (rc == -EPIPE) {
       /* EPIPE means underrun */
       fprintf(stderr, "underrun occurred\n");
