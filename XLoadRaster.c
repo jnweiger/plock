@@ -2,8 +2,8 @@
  * XLoadRaster.c -- plock loads rasterfiles
  *
  */
-#include "rcs.h"
-RCS_ID("$Id$ FAU")
+// #include "rcs.h"
+// RCS_ID("$Id$ FAU")
 
 #include <X11/Xlib.h>
 #include <sys/errno.h>

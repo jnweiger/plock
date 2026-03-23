@@ -7,7 +7,8 @@
 #include <X11/Xlib.h>
 Colormap xmap;
 
-# define SEC_PER_TICK 60
+#define SEC_PER_TICK 60
+#define DEBUG 1
 
 int real_depth;
 
@@ -33,6 +34,7 @@ Cursor crs;
 XHostAddress *hosts;
 Bool hoststate;
 unsigned char empty[2] = { 0, 0 };
+
 
 static void set_colors(r, g, b, len)
   unsigned char *r, *g, *b;
@@ -62,6 +64,49 @@ static void set_colors(r, g, b, len)
   XStoreColor(stage.Dis, xmap, &xcol);
 }
 
+
+static XImage *expand_8bit_to_24bit(XImage *im, colormap_t *cmap)
+{
+  int w = im->width, h = im->height;
+  int new_bpl = w * 4;  // 32 bits per pixel
+  char *new_data = malloc(h * new_bpl);
+
+  for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+      {
+        unsigned char idx = (unsigned char)im->data[y * im->bytes_per_line + x];
+        unsigned char r = cmap->map[0][idx];
+        unsigned char g = cmap->map[1][idx];
+        unsigned char b = cmap->map[2][idx];
+        unsigned long pixel = (r << 16) | (g << 8) | b;
+        *(unsigned long *)(new_data + y * new_bpl + x * 4) = pixel;
+      }
+
+  XImage *new_im = XCreateImage(stage.Dis, stage.vis, 24, ZPixmap, 0, new_data, w, h, 32, new_bpl);
+  return new_im;
+}
+
+
+static XImage *expand_1bit_to_24bit(XImage *im)
+{
+  int w = im->width, h = im->height;
+  int new_bpl = w * 4;  // 32 bits per pixel
+  char *new_data = malloc(h * new_bpl);
+
+  for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++)
+      {
+        unsigned char byte = (unsigned char)im->data[y * im->bytes_per_line + (x >> 3)];
+	    // stage.white and stage.black on a 24-bit TrueColor display are typically 0xFFFFFF and 0x000000.
+        unsigned long pixel = (byte & (0x80 >> (x & 7))) ? stage.white : stage.black;
+        *(unsigned long *)(new_data + y * new_bpl + x * 4) = pixel;
+      }
+
+  XImage *new_im = XCreateImage(stage.Dis, stage.vis, 24, ZPixmap, 0, new_data, w, h, 32, new_bpl);
+  return new_im;
+}
+
+
 XImage *
 LoadImageFromRasterfileFp(Dis, Sc, fp)
 Display *Dis;
@@ -77,15 +122,29 @@ FILE *fp;
 
   if(Im == NULL)
     {
-      perror("XLoadRasterfile");
+      // perror("XLoadRasterfile");
       return NULL;
     }
 
-  if(options.color && cmap.map[0] && no_colors_yet)
+  if (options.color && cmap.map[0] && no_colors_yet && stage.depth <= 8)
     {
       set_colors(cmap.map[0], cmap.map[1], cmap.map[2], cmap.length/3);
       no_colors_yet = 0;
     }
+
+  if (Im->depth == 1 && stage.depth == 24)
+    {
+      XImage *new_im = expand_1bit_to_24bit(Im);
+      XDestroyImage(Im);
+      Im = new_im;
+    }
+  else if (Im->depth == 8 && cmap.map[0] && stage.depth == 24)
+    {
+      XImage *new_im = expand_8bit_to_24bit(Im, &cmap);
+	  XDestroyImage(Im);
+	  Im = new_im;
+	}
+
   if(cmap.map[0]) { free(cmap.map[0]); cmap.map[0] = 0; }
   if(cmap.map[1]) { free(cmap.map[1]); cmap.map[1] = 0; }
   if(cmap.map[2]) { free(cmap.map[2]); cmap.map[2] = 0; }
@@ -140,24 +199,50 @@ int main(int argc, char **argv)
   height = DisplayHeight(stage.Dis, stage.Sc);
   stage.white = WhitePixel(stage.Dis, stage.Sc);
   stage.black = BlackPixel(stage.Dis, stage.Sc);
+  stage.vis = DefaultVisual(stage.Dis, stage.Sc);
 
   bzero((char *)&curcol, sizeof(XColor));
   curcol.pixel = stage.black;
   /* "empty" cursor */
 
-  XImage *im = LoadImageFromRasterfile(stage.Dis, stage.Sc, argv[1]);
-  if (im->depth == 1)
-    Image1to8(&im, PADDING);	// huch, this converts to 24 bits per pixel.
+  if (stage.depth < 24)
+	{
+	  printf("creating xmap...");
+	  // install a writable colormap, in case we are a PseudoColor display
+	  xmap = XCreateColormap(stage.Dis, rootwin, stage.vis, AllocAll);
+	  XInstallColormap(stage.Dis, xmap);
+	}
 
+  FILE *fp;
+  if ((fp = fopen(argv[1], "r")) == NULL)
+    {
+      perror(argv[1]);
+      return 1;
+	}
+
+  int ims_count = 0;
+  static XImage *ims[100];
+  for (;;)
+    {
+	  XImage *im = LoadImageFromRasterfileFp(stage.Dis, stage.Sc, fp);
+	  if (!im || ims_count > 99)
+	    break;
+	  ims[ims_count++] = im;
+	}
+  fclose(fp);
+
+#if DEBUG
   printf("dummy main, stage.depth = %d\n", real_depth);
-  printf("Image size: w=%d h=%d, im->depth=%d, im->bits_per_pixel=%d\n", im->width, im->height, im->depth, im->bits_per_pixel);
+  printf("Image size: w=%d h=%d, im->depth=%d, im->bits_per_pixel=%d\n", ims[0]->width, ims[0]->height, ims[0]->depth, ims[0]->bits_per_pixel);
+  printf("Images counter: %d\n", ims_count);
+#endif
 
   // Create a window
 #define WIN_HEIGHT 600
 #define WIN_WIDTH 800
   Window window = XCreateSimpleWindow(stage.Dis, rootwin, 0, 0, WIN_WIDTH, WIN_HEIGHT, 1, stage.black, stage.white);
 
-  XSelectInput(stage.Dis, window, ExposureMask);
+  XSelectInput(stage.Dis, window, ExposureMask | KeyPressMask | StructureNotifyMask);	// StructureNotifyMask is needed for MapNotify
   XMapWindow(stage.Dis, window);
   // Wait for the MapNotify event
   XEvent event;
@@ -165,13 +250,19 @@ int main(int argc, char **argv)
      XNextEvent(stage.Dis, &event);
   } while (event.type != MapNotify);
 
+#if DEBUG
+  printf("XCreatePixmap ...\n");
+#endif
+
   // Create an X pixmap and draw the XImage onto it
   Pixmap pixmap = XCreatePixmap(stage.Dis, window, WIN_WIDTH, WIN_HEIGHT, real_depth);
   GC gc = DefaultGC(stage.Dis, stage.Sc);
-  XPutImage(stage.Dis, pixmap, gc, im, 0, 0, 0, 0, im->width, im->height);
+  // XPutImage(display, drawable, gc, image, src_x, src_y, dst_x, dst_y, width, height)
+  for (int i = 0; i < ims_count; i++)	// take the first four, max.
+    XPutImage(stage.Dis, pixmap, gc, ims[i], 0, 0, (i%8)*ims[i]->width, (i>>3)*ims[i]->height, ims[i]->width, ims[i]->height);
 
   // Draw the pixmap onto the window
-  XCopyArea(stage.Dis, pixmap, window, gc, 0, 0, im->width, im->height, 0, 0);
+  XCopyArea(stage.Dis, pixmap, window, gc, 0, 0, ims[0]->width*8, ims[0]->height*8, 0, 0);
 
   // Flush the display to ensure changes are visible
   XFlush(stage.Dis);
@@ -183,7 +274,7 @@ int main(int argc, char **argv)
       if (event.type == Expose)
         {
           // Redraw the pixmap on expose events
-          XCopyArea(stage.Dis, pixmap, window, gc, 0, 0, im->width, im->height, 0, 0);
+          XCopyArea(stage.Dis, pixmap, window, gc, 0, 0, ims[0]->width*8, ims[0]->height*8, 0, 0);
           XFlush(stage.Dis);
         }
       else if (event.type == KeyPress)
@@ -195,7 +286,8 @@ int main(int argc, char **argv)
     }
 
   // Clean up
-  XDestroyImage(im);
+  for (int i = 0; i < ims_count; i++)
+    XDestroyImage(ims[i]);
   XFreePixmap(stage.Dis, pixmap);
   XCloseDisplay(stage.Dis);
 

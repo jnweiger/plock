@@ -16,7 +16,9 @@ sound:
 	./play_plock < ../rasterfiles/sound/explode.snd
 
 loadras: ../XLoadRaster.o loadras.c
-	cc -g -O0 loadras.c  ../XLoadRaster.c -o loadras -lX11
+	cc -g -O0 -Wno-old-style-definition loadras.c  ../XLoadRaster.c -o loadras -lX11
+	./loadras ../rasterfiles/catras/clock.ras
+	./loadras ../rasterfiles/catras/bombers.ras
 
 l1_list: l1_list.c
 	cc     l1_list.c   -o l1_list -lasound
