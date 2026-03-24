@@ -176,6 +176,12 @@ int main() {
       fprintf(stderr,
               "short read: read %d bytes, (expected %d)\n", rc, size_wanted);
     }
+
+    // FIXME: spawn a thread, or make this nonblocking via:
+	// snd_pcm_uframes_t avail = snd_pcm_avail_update(pcm);
+    // snd_pcm_uframes_t chunksize = avail < 1024 ? avail : 1024;  // or hw buffer_size
+    // snd_pcm_writei(pcm, data, chunksize);
+
 	void *bufs[1] = { buffer };
 	rc = snd_pcm_writen(handle, bufs, frames_wanted);
     // rc = snd_pcm_writei(handle, buffer, frames_wanted);

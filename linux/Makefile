@@ -5,20 +5,30 @@
 # Suse Requires:
 #	zypper install alsa-devel
 #
-all: loadras
+all: anim_ras
 
 sound:
-	cc     play_plock.c   -o play_plock -l asound
-	./play_plock < ../rasterfiles/sound/new_level.snd
-	./play_plock < ../rasterfiles/sound/open_the_box.snd
-	./play_plock < ../rasterfiles/sound/lets_go.snd
-	./play_plock < ../rasterfiles/sound/oh_no.snd
-	./play_plock < ../rasterfiles/sound/explode.snd
+	cc    -DSTANDALONE=1  play_alsa.c   -o play_alsa -l asound
+	./play_alsa < ../rasterfiles/sound/new_level.snd
+	./play_alsa < ../rasterfiles/sound/open_the_box.snd
+	./play_alsa < ../rasterfiles/sound/lets_go.snd
+	./play_alsa < ../rasterfiles/sound/oh_no.snd
+	./play_alsa < ../rasterfiles/sound/explode.snd
+
+
+%.o: %.c
+	cc -g -O0 -Wno-old-style-definition -c $< -o $@
+
 
 loadras: ../XLoadRaster.o loadras.c
-	cc -g -O0 -Wno-old-style-definition loadras.c  ../XLoadRaster.c -o loadras -lX11
-	./loadras ../rasterfiles/catras/clock.ras
+	cc -g -O0 -Wno-old-style-definition -DSTANDALONE=1 loadras.c  ../XLoadRaster.o -o loadras -lX11
+	./loadras ../rasterfiles/catras/clock.ras &
 	./loadras ../rasterfiles/catras/bombers.ras
+
+
+anim_ras: ../XLoadRaster.o anim_ras.o loadras.o
+	cc -g -O0 -Wno-old-style-definition anim_ras.o loadras.o ../XLoadRaster.o -o anim_ras -lX11
+
 
 l1_list: l1_list.c
 	cc     l1_list.c   -o l1_list -lasound
@@ -31,4 +41,5 @@ l4_rec: l4_rec.c
 
 clean:
 	rm -f l1_list l2_open l3_play l4_rec
-	rm -f loadras play_plock
+	rm -f loadras play_alsa anim_ras
+	rm -rf *.o

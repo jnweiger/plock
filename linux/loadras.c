@@ -1,4 +1,5 @@
 #include <assert.h>
+#ifdef STANDALONE
 #include <X11/Xutil.h>
 #include <X11/keysym.h> // Include this for key symbols
 
@@ -7,10 +8,12 @@
 #include <X11/Xlib.h>
 Colormap xmap;
 
+int real_depth;
+#endif
+
 #define SEC_PER_TICK 60
 #define DEBUG 1
 
-int real_depth;
 
 // from anim.c
 
@@ -20,13 +23,15 @@ int real_depth;
 #define PADDING 32 /* bitmap_pad for XImage creation */
 
 extern int real_depth;	// read access in anim.c - it is written in plock.c:main() 
+
+#ifdef STANDALONE
 struct _stage stage;	// stage.vis and stage.depth is used here.
 
 struct Option options = 
 {
   SEC_PER_TICK, 0, USE_COLOR, 0, 0, 0, 1, 0, 0
 };
-  
+
 Colormap xmap, dmap;
 char *dpyname, *LoginName = NULL;
 Window rootwin;
@@ -34,6 +39,7 @@ Cursor crs;
 XHostAddress *hosts;
 Bool hoststate;
 unsigned char empty[2] = { 0, 0 };
+#endif
 
 
 static void set_colors(r, g, b, len)
@@ -44,7 +50,7 @@ static void set_colors(r, g, b, len)
   XColor xcol;
   int i;
 
-  for(i = 0; i < len; i++)
+  for (i = 0; i < len; i++)
     {
       xcol.pixel = i;
       xcol.red = r[i] << 8;
@@ -120,7 +126,7 @@ FILE *fp;
   cmap.map[0] = cmap.map[1] = cmap.map[2] = 0;
   Im = XLoadRasterfile(Dis, stage.vis, fp, &cmap, PADDING);
 
-  if(Im == NULL)
+  if (Im == NULL)
     {
       // perror("XLoadRasterfile");
       return NULL;
@@ -145,9 +151,9 @@ FILE *fp;
 	  Im = new_im;
 	}
 
-  if(cmap.map[0]) { free(cmap.map[0]); cmap.map[0] = 0; }
-  if(cmap.map[1]) { free(cmap.map[1]); cmap.map[1] = 0; }
-  if(cmap.map[2]) { free(cmap.map[2]); cmap.map[2] = 0; }
+  if (cmap.map[0]) { free(cmap.map[0]); cmap.map[0] = 0; }
+  if (cmap.map[1]) { free(cmap.map[1]); cmap.map[1] = 0; }
+  if (cmap.map[2]) { free(cmap.map[2]); cmap.map[2] = 0; }
 
   if (cmap.length > (3 << stage.depth))
     {
@@ -177,7 +183,7 @@ char *name;
   return Im;
 }
 
-
+#ifdef STANDALONE
 int main(int argc, char **argv)
 {
   char *dpyname = NULL;		// NULL: take env DISPLAY, or try ":0.0";
@@ -186,7 +192,7 @@ int main(int argc, char **argv)
   Window rootwin;
 
   // another excerpt from plock.c
-  if((stage.Dis = XOpenDisplay(dpyname)) == NULL)
+  if ((stage.Dis = XOpenDisplay(dpyname)) == NULL)
     {
       fprintf(stderr,
       "Can't connect server.\nPlease check the DISPLAY environment variable\n");
@@ -232,7 +238,7 @@ int main(int argc, char **argv)
   fclose(fp);
 
 #if DEBUG
-  printf("dummy main, stage.depth = %d\n", real_depth);
+  printf("dummy loadras.c main, stage.depth = %d\n", real_depth);
   printf("Image size: w=%d h=%d, im->depth=%d, im->bits_per_pixel=%d\n", ims[0]->width, ims[0]->height, ims[0]->depth, ims[0]->bits_per_pixel);
   printf("Images counter: %d\n", ims_count);
 #endif
@@ -293,3 +299,4 @@ int main(int argc, char **argv)
 
   return 0;
 }
+#endif // STANDALONE

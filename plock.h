@@ -184,7 +184,7 @@ struct _stage
   struct lem_move *lem;
 };
 
-extern time_t time();
+extern time_t time __P((time_t *));
 typedef void (*sighandler_t)(int);
 
 extern struct _stage stage;
