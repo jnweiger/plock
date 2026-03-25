@@ -6,15 +6,18 @@
  * 2026-03-24, juergen@fabmail.org
  */
 
-#include <unistd.h>		// for getuid()
-#include <time.h>		// for time()
+#include <unistd.h>              // for getuid()
+#include <time.h>                // for time()
 #include <assert.h>
 #include <X11/Xutil.h>
-#include <X11/keysym.h> // Include this for key symbols
+#include <X11/keysym.h>          // Include this for key symbols
 
 // from plock.c
 
 #include <X11/Xlib.h>
+#include <sys/select.h>			// for select()
+#include <errno.h>				// for errno
+
 Colormap xmap;
 int real_depth;
 static int status = 0;
@@ -76,6 +79,24 @@ Display *dpy;
   XGetKeyboardControl(dpy, &state);
   return state.bell_percent;
 }
+
+#if 1
+int
+WaitSoundPlayed()
+{
+  // FIXME: this is a stub
+  return 0;
+}
+
+int
+PlaySound(name, gain)
+char *name;
+int gain;
+{
+  // FIXME: this is a stub.
+  return 0;
+}
+#endif
 
 
 void free_all()
@@ -209,6 +230,98 @@ static void eat_events()
 }
 
 
+#define TIMELEFT(t1, t2) ((t1.tv_sec > t2.tv_sec) || ((t1.tv_sec == t2.tv_sec) && (t1.tv_usec >= t2.tv_usec)))
+
+/*
+ * to is timeout in milliseconds.
+ */
+int
+mu(to, poll)
+int to, poll;
+{
+  int j, exceed = 0;
+  fd_set read_fd;
+  struct timeval tv, end, now;
+  struct timezone tz;
+  static struct timeval tstamp;
+
+  if (!to)
+    {
+      /*
+       * initialize our timestamp without looking at it.
+       */
+      gettimeofday(&tstamp, &tz);
+      return 1;
+    }
+
+  gettimeofday(&now, &tz);
+  end.tv_sec = tstamp.tv_sec + to / 1000;
+  end.tv_usec = tstamp.tv_usec + (to % 1000) * 1000;
+  while (end.tv_usec > 999999)
+    {
+      end.tv_usec -= 1000000;
+      end.tv_sec++;
+    }
+
+  tv.tv_sec = tv.tv_usec = 0;
+  if (TIMELEFT(end, now)) 
+    {
+      if (poll == MU_BLOCK)
+        {
+          /*
+           * user called us early enough
+           * and wants us to sleep.
+           */
+          tv.tv_sec = end.tv_sec - now.tv_sec;
+          tv.tv_usec = end.tv_usec - now.tv_usec;
+          while (tv.tv_usec < 0)
+            {
+              tv.tv_usec += 1000000;
+              tv.tv_sec--;
+            }
+          exceed = 1;
+        }
+    }
+  else
+    exceed = 1;
+
+  FD_ZERO(&read_fd);
+  FD_SET(XConnectionNumber(stage.Dis), &read_fd);
+
+  errno = 0;
+  while ((j = select(FD_SETSIZE, &read_fd, 0, 0, &tv)) > 0)
+    {
+      eat_events();
+      gettimeofday(&now, &tz);
+      if ((poll == MU_BLOCK) && TIMELEFT(end, now)) 
+        {
+          /*
+           * still too early, continue sleeping.
+           */
+          tv.tv_sec = end.tv_sec - now.tv_sec;
+          tv.tv_usec = end.tv_usec - now.tv_usec;
+          while (tv.tv_usec < 0)
+            {
+              tv.tv_usec += 1000000;
+              tv.tv_sec--;
+            }
+          FD_ZERO(&read_fd);
+          FD_SET(XConnectionNumber(stage.Dis), &read_fd);
+        }
+      else
+        tv.tv_sec = tv.tv_usec = 0;
+    }
+  if (j < 0)
+    perror("select");
+  if (exceed)
+    {
+      tstamp = end;
+      return 1;
+    }
+  return 0;
+}
+
+
 static int mu_drawframe __P((int, int));
 
 /*
@@ -263,8 +376,8 @@ static void set_colors(r, g, b, len)
   XStoreColor(stage.Dis, xmap, &xcol);
 }
 
-extern XImage *LoadImageFromRasterfileFp(Display *Dis, int Sc, FILE *fp);	// from loadras.c
-extern XImage *LoadImageFromRasterfile(Display *Dis, int Sc, char *name);	// from loadras.c
+extern XImage *LoadImageFromRasterfileFp(Display *Dis, int Sc, FILE *fp);    // from loadras.c
+extern XImage *LoadImageFromRasterfile(Display *Dis, int Sc, char *name);    // from loadras.c
 
 /* 
 #ifdef NOCATFILES
@@ -1661,7 +1774,7 @@ int handler(dis, ev)
 typedef void (*sighandler_t)(int);
 
 
-#if 1	// def STANDALONE
+#if 1    // def STANDALONE
 int main(int argc, char **argv)
 {
   XSetWindowAttributes xswa;
@@ -1698,7 +1811,7 @@ int main(int argc, char **argv)
   curcol.pixel = stage.black;
   /* "empty" cursor */
   pm = XCreatePixmapFromBitmapData(stage.Dis, rootwin, 
-	       (char *)empty, 2, 2, 1, 0, 1);
+               (char *)empty, 2, 2, 1, 0, 1);
   crs = XCreatePixmapCursor(stage.Dis, pm, pm, &curcol, &curcol, 0, 0);
   XFreePixmap(stage.Dis, pm);
  
@@ -1759,12 +1872,12 @@ int main(int argc, char **argv)
   stage.Win = XCreateWindow(stage.Dis, rootwin, 
                       0, 0, width, height, 0, CopyFromParent,
                       InputOutput, 
-		      (options.color && stage.depth > 1) ? 
-		                                    stage.vis : CopyFromParent,
+                      (options.color && stage.depth > 1) ? 
+                                                    stage.vis : CopyFromParent,
                       CWEventMask | CWCursor | CWBackPixel | 
-		      CWBackingStore | CWBorderPixel |
-		      ((options.color && stage.depth > 1) ? CWColormap : 0) | 
-		      (options.nolock ? 0 : CWOverrideRedirect) ,
+                      CWBackingStore | CWBorderPixel |
+                      ((options.color && stage.depth > 1) ? CWColormap : 0) | 
+                      (options.nolock ? 0 : CWOverrideRedirect) ,
                       &xswa);
   wmh.input = True;
   XSetWMHints(stage.Dis, stage.Win, &wmh);
@@ -1772,13 +1885,13 @@ int main(int argc, char **argv)
   gcval.background = stage.black; gcval.foreground = stage.white;
   gcval.font = fnt->fid;
   stage.wonb = XCreateGC(stage.Dis, stage.Win,
-			 GCBackground | GCForeground | GCFont, &gcval);
+                         GCBackground | GCForeground | GCFont, &gcval);
   gcval.background =  stage.white; gcval.foreground = stage.black ;
   stage.bonw = XCreateGC(stage.Dis, stage.Win,
-			 GCBackground | GCForeground | GCFont, &gcval);
+                         GCBackground | GCForeground | GCFont, &gcval);
   gcval.font = fntl->fid;
   stage.bonwl = XCreateGC(stage.Dis, stage.Win,
-			 GCBackground | GCForeground | GCFont, &gcval);
+                         GCBackground | GCForeground | GCFont, &gcval);
 
   /* 
    * open the window 

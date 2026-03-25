@@ -8,7 +8,10 @@
 all: anim_ras
 
 CC = gcc
-CFLAGS = -g -O0 -Wno-old-style-definition -std=gnu89 -Wno-implicit-function-declaration
+CFLAGS = -g -O0 -Wno-old-style-definition -std=gnu99 -Wno-implicit-function-declaration
+
+# Search current dir first, then parent dir
+VPATH = . ..
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $<
@@ -22,14 +25,14 @@ sound:
 	./play_alsa < ../rasterfiles/sound/explode.snd
 
 
-loadras: ../XLoadRaster.o loadras.c
-	cc -g -O0 -Wno-old-style-definition -DSTANDALONE=1 loadras.c ../XLoadRaster.o -o loadras -lX11
+loadras: loadras.c XLoadRaster.o
+	cc $(CFLAGS) -DSTANDALONE=1 loadras.c XLoadRaster.o -o loadras -lX11
 	./loadras ../rasterfiles/catras/clock.ras &
 	./loadras ../rasterfiles/catras/bombers.ras
 
 
-anim_ras: ../image.o ../XLoadRaster.o anim_ras.o loadras.o
-	cc -g -O0 -Wno-old-style-definition anim_ras.o loadras.o ../image.o ../XLoadRaster.o -o anim_ras -lX11
+anim_ras:            anim_ras.o loadras.o explode.o image.o XLoadRaster.o
+	cc $(CFLAGS) anim_ras.o loadras.o explode.o image.o XLoadRaster.o -o anim_ras -lX11
 
 
 l1_list: l1_list.c
@@ -44,4 +47,4 @@ l4_rec: l4_rec.c
 clean:
 	rm -f l1_list l2_open l3_play l4_rec
 	rm -f loadras play_alsa anim_ras
-	rm -rf *.o ../*.o
+	rm -rf *.o
