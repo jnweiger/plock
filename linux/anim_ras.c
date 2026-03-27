@@ -516,13 +516,12 @@ int nframes, offset, xstep, ystep;
 #ifdef NOCATFILES
           sprintf(fmt, "%s/%s/%s", plockdir, maskdir, mask);
           sprintf(buf, fmt, i + offset);
-          if ((*Imp = LoadImageFromRasterfile(Dis, Sc, buf, 0)) == NULL)
+          if ((*Imp = LoadImageFromRasterfile(Dis, Sc, buf, 1)) == NULL)
 #else
-          if ((*Imp = LoadImageFromRasterfileFp(Dis, Sc, fp, 0)) == NULL)
+          if ((*Imp = LoadImageFromRasterfileFp(Dis, Sc, fp, 1)) == NULL)
 #endif
             {
-              fprintf(stderr, "cannot LoadImageFromRasterfile(Dis,Sc,'%s');\n",
-                      buf);
+              fprintf(stderr, "cannot LoadImageFromRasterfile(Dis,Sc,'%s'); mask\n", buf);
               while (i-- > 0)
                 XDestroyImage(*--Imp);
               for (i = 0; i < nframes; i++)
