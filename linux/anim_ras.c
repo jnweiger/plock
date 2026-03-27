@@ -2,7 +2,7 @@
  * anim_ras.c -- plock animation code
  *
  * jw 14.1.1992
- * 
+ *
  * 2026-03-24, juergen@fabmail.org
  */
 
@@ -42,7 +42,7 @@ static int badlog = 0;
 extern int real_depth;
 struct _stage stage;
 
-struct Option options = 
+struct Option options =
 {
   SEC_PER_TICK, 0, USE_COLOR, 0, 0, 0, 1, 0, 0
 };
@@ -75,7 +75,7 @@ get_bell_vol(dpy)
 Display *dpy;
 {
   XKeyboardState state;
-  
+
   XGetKeyboardControl(dpy, &state);
   return state.bell_percent;
 }
@@ -135,7 +135,7 @@ void free_all()
   if (stage.vac_bot)
     DestroyMovement(stage.vac_bot);
   /*
-   destroy LEMMING 
+   destroy LEMMING
    */
   XCloseDisplay(stage.Dis);
   exit(0);
@@ -205,7 +205,7 @@ static void eat_events()
                     ptr--;
                   }
               }
-            else 
+            else
               if (key >= XK_space && key <= XK_asciitilde)
                 {
                   if (ptr < buf + MBUFLEN - 1)
@@ -264,7 +264,7 @@ int to, poll;
     }
 
   tv.tv_sec = tv.tv_usec = 0;
-  if (TIMELEFT(end, now)) 
+  if (TIMELEFT(end, now))
     {
       if (poll == MU_BLOCK)
         {
@@ -293,7 +293,7 @@ int to, poll;
     {
       eat_events();
       gettimeofday(&now, &tz);
-      if ((poll == MU_BLOCK) && TIMELEFT(end, now)) 
+      if ((poll == MU_BLOCK) && TIMELEFT(end, now))
         {
           /*
            * still too early, continue sleeping.
@@ -376,10 +376,10 @@ static void set_colors(r, g, b, len)
   XStoreColor(stage.Dis, xmap, &xcol);
 }
 
-extern XImage *LoadImageFromRasterfileFp(Display *Dis, int Sc, FILE *fp);    // from loadras.c
-extern XImage *LoadImageFromRasterfile(Display *Dis, int Sc, char *name);    // from loadras.c
+extern XImage *LoadImageFromRasterfileFp(Display *Dis, int Sc, FILE *fp, int ismask);    // from loadras.c
+extern XImage *LoadImageFromRasterfile(Display *Dis, int Sc, char *name, int ismask);    // from loadras.c
 
-/* 
+/*
 #ifdef NOCATFILES
  * name is a concatenated archive of frames
 #else
@@ -404,7 +404,7 @@ int nframes, offset, xstep, ystep;
   XImage **Imp;
   int black, i;
   FILE *fp;
-         
+
   An = (struct anim *)malloc(sizeof(struct anim));
   An->frames = (XImage **)malloc(sizeof(XImage *) * nframes);
   if (mask)
@@ -431,9 +431,9 @@ int nframes, offset, xstep, ystep;
 #ifdef NOCATFILES
       sprintf(fmt, "%s/%s/%s", plockdir, framedir, name);
       sprintf(buf, fmt, i + offset);
-      if ((*Imp = LoadImageFromRasterfile(Dis, Sc, buf)) == NULL)
+      if ((*Imp = LoadImageFromRasterfile(Dis, Sc, buf, 0)) == NULL)
 #else
-      if ((*Imp = LoadImageFromRasterfileFp(Dis, Sc, fp)) == NULL)
+      if ((*Imp = LoadImageFromRasterfileFp(Dis, Sc, fp, 0)) == NULL)
 #endif
         {
           fprintf(stderr, "cannot LoadImageFromRasterfile(Dis, Sc, '%s');\n",
@@ -468,9 +468,9 @@ int nframes, offset, xstep, ystep;
         {
           if (An->width != (*Imp)->width || An->height != (*Imp)->height)
             {
-              fprintf(stderr, 
+              fprintf(stderr,
 "frame size mismatch: %s (%d, %d) should match size of first frame (%d, %d)\n",
-                      buf, (*Imp)->width, (*Imp)->height, 
+                      buf, (*Imp)->width, (*Imp)->height,
                       An->width, An->height);
               Free(An);
               return NULL;
@@ -493,7 +493,7 @@ int nframes, offset, xstep, ystep;
 #ifndef NOCATFILES
   fclose(fp);
 #endif
-  if (mask)  
+  if (mask)
     {
       char *p;
       int l;
@@ -516,9 +516,9 @@ int nframes, offset, xstep, ystep;
 #ifdef NOCATFILES
           sprintf(fmt, "%s/%s/%s", plockdir, maskdir, mask);
           sprintf(buf, fmt, i + offset);
-          if ((*Imp = LoadImageFromRasterfile(Dis, Sc, buf)) == NULL) 
+          if ((*Imp = LoadImageFromRasterfile(Dis, Sc, buf, 0)) == NULL)
 #else
-          if ((*Imp = LoadImageFromRasterfileFp(Dis, Sc, fp)) == NULL)
+          if ((*Imp = LoadImageFromRasterfileFp(Dis, Sc, fp, 0)) == NULL)
 #endif
             {
               fprintf(stderr, "cannot LoadImageFromRasterfile(Dis,Sc,'%s');\n",
@@ -542,13 +542,15 @@ int nframes, offset, xstep, ystep;
             }
           if (An->width > (*Imp)->width || An->height > (*Imp)->height)
             {
-              fprintf(stderr, 
+              fprintf(stderr,
 "mask size mismatch: %s (%d, %d) should match size of first frame (%d, %d)\n",
-                      buf, (*Imp)->width, (*Imp)->height, 
+                      buf, (*Imp)->width, (*Imp)->height,
                       An->width, An->height);
               Free(An);
               return NULL;
             }
+
+		  // bit flip mask data
           p = (*Imp)->data;
           l = (*Imp)->bytes_per_line * (*Imp)->height;
           while (l--)
@@ -557,7 +559,7 @@ int nframes, offset, xstep, ystep;
               p++;
             }
           Imp++;
-        } 
+        }
 #ifndef NOCATFILES
       fclose(fp);
 #endif
@@ -569,7 +571,7 @@ int DestroyAnim(an)
 struct anim *an;
 {
   int i;
-  
+
   if (an->refcount > 0)
     {
       return 1;
@@ -602,7 +604,7 @@ char **sp;
   return 0;
 }
 
-int 
+int
 skipuntil(s, sp)
 char *s, **sp;
 {
@@ -634,7 +636,7 @@ int *ip;
 {
   int r = 0;
   int sig = 1;
-  
+
   if (!pp || !*pp)
     return r;
   if (ip)
@@ -660,8 +662,8 @@ int *ip;
   skipspace(pp);
   *ip *= sig;
   return r;
-}      
-  
+}
+
 /*
  * path is a komma seperated list of decimal number pairs
  */
@@ -674,18 +676,18 @@ char *path;
   struct movement *Mv;
   struct pathpoint **pp;
   int x1, y1;
-  
+
   Mv = (struct movement *)malloc(sizeof(struct movement));
   Mv->an = An;
   An->refcount++;
   Mv->x = Mv->pathx = x;
   Mv->y = Mv->pathy = y;
-  Mv->frame = startframe % An->nframes; 
+  Mv->frame = startframe % An->nframes;
   Mv->step = framestep;
   Mv->pixeltime = pixtime;
   Mv->layer = layer;
   pp = &Mv->path_base;
-    
+
   while (skipnum(&path, &x1) && skipnum(&path, &y1))
     {
       if (*path == ',')
@@ -698,9 +700,9 @@ char *path;
   *pp = NULL;
   Mv->path = Mv->path_base;
   return Mv;
-}   
+}
 
-int 
+int
 DestroyMovement(mv)
 struct movement *mv;
 {
@@ -715,8 +717,8 @@ struct movement *mv;
   Free(mv);
   return 0;
 }
-                                                
-int 
+
+int
 SetGrid(g, x1, y1, x2, y2, val)
 char *g;
 int x1, y1, x2, y2, val;
@@ -750,16 +752,16 @@ int x1, y1, x2, y2, val;
   return 0;
 }
 
-int 
+int
 EraseFrameGrid(mp, g)
 struct movement *mp;
 char *g;
 {
-  return SetGrid(g, mp->prev_x, mp->prev_y, 
+  return SetGrid(g, mp->prev_x, mp->prev_y,
                  mp->prev_x + mp->an->width,
                  mp->prev_y + mp->an->height, GRID_CLEAR);
 }
-  
+
 int
 frame_adjust(mp, x, y)
 struct movement *mp;
@@ -796,25 +798,25 @@ char *g;
       fprintf(stderr, "DrawFrameGrid: no move, no anim, no frames, no luck\n");
       return -1;
     }
-  /* 
+  /*
    * Hack: numbers come here with frame == -1, as we do not have a zero.
    */
   if (mp->frame < 0)
     return 0;
   Im = mp->an->frames[mp->frame];
   Imm = mp->an->masks ? mp->an->masks[mp->frame] : NULL;
-  ImOverImGrid(stage.Work, Im, Imm, mp->x, mp->y, 
+  ImOverImGrid(stage.Work, Im, Imm, mp->x, mp->y,
                0, 0, Im->width, Im->height, g);
   mp->prev_x = mp->x;
   mp->prev_y = mp->y;
   mp->frame += mp->step;
   flag = pathend = 0;
-  while (mp->frame < 0) 
+  while (mp->frame < 0)
     {
       mp->frame += mp->an->nframes;
       flag = 1;
     }
-  while (mp->frame >= mp->an->nframes) 
+  while (mp->frame >= mp->an->nframes)
     {
       mp->frame -= mp->an->nframes;
       flag = 1;
@@ -942,7 +944,7 @@ struct lem_move *lp;
   int Sc = stage.Sc;
 
   lp->status = lp->prev_status = LEM_NOTSTARTED;
-  /* 
+  /*
    * the faller1 comes out of the box, he appears at the bottom edge of
    * box_top. He falls down, until he lands on top of the clock.
    */
@@ -955,8 +957,8 @@ struct lem_move *lp;
   x = 10 + stage.box_open->x + (stage.box_open->an->width >> 1) - (An->width >> 1);
   y = 11 + stage.screeny - stage.Clock->height - An->height;
   sprintf(path, "%d %d", x, y + 34);
-  lp->faller1 = CreateMovementFromAnim(An, 
-                          x, stage.box_top->an->height - An->height, 
+  lp->faller1 = CreateMovementFromAnim(An,
+                          x, stage.box_top->an->height - An->height,
                           0, 1, 100, 1, path);
   mu_drawframe(options.speed * 1000, MU_POLL);
   /*
@@ -974,22 +976,22 @@ struct lem_move *lp;
   lp->walker1 = CreateMovementFromAnim(An, lp->faller1->x + 30, y + 30,
                           0, 1, 200, 0, path);
   mu_drawframe(options.speed * 1000, MU_POLL);
-  /* 
+  /*
    * faller2 drops off the left edge of the clock and hits the floor.
    */
   sprintf(path, "%d %d", x - 5, stage.screeny - An->height - 10);
-  lp->faller2 = CreateMovementFromAnim(lp->faller1->an, 
+  lp->faller2 = CreateMovementFromAnim(lp->faller1->an,
                         x - 5, y + 88,
                          0, 1, 100, 0, path);
-  /* 
+  /*
    * walker2 walks on the floor off the stage, left hand side.
    */
   y = stage.screeny - An->height;
   sprintf(path, "%d %d", -An->width * 2, y);
-  lp->walker2 = CreateMovementFromAnim(lp->walker1->an, x + 30, y, 
+  lp->walker2 = CreateMovementFromAnim(lp->walker1->an, x + 30, y,
                           0, 1, 200, 0, path);
   /*
-   * bomber comes back from the left side and walks to the middle of the 
+   * bomber comes back from the left side and walks to the middle of the
    * screen. He won't make it to the other side...
    */
   if (stage.lem->bomber)
@@ -1013,8 +1015,8 @@ struct lem_move *lp;
   lp->fire = CreateMovementFromAnim(An, lp->bomber->x + 66, y + 13 - An->height,
                         0, 1, 300, 1, NULL);
   mu_drawframe(options.speed * 1000, MU_POLL);
-  /* 
-   * numbers are strange. the don't flip on every frame. but they move. 
+  /*
+   * numbers are strange. the don't flip on every frame. but they move.
    */
   if (stage.lem->numbers)
     An = stage.lem->numbers->an;
@@ -1028,8 +1030,8 @@ struct lem_move *lp;
   mu_drawframe(options.speed * 1000, MU_POLL);
   return 0;
 }
-  
-int 
+
+int
 initstage()
 {
   Window Win;
@@ -1052,7 +1054,7 @@ initstage()
   stage.grid_h = ((stage.screeny - 1) >> GRID_Y_SHIFT) + 2;
   stage.grid = (char *)malloc(stage.grid_w * stage.grid_h);
   Im = XCreateImage(Dis, stage.vis, stage.depth,
-                    stage.depth == 1 ? XYPixmap : ZPixmap, 0, NULL, 
+                    stage.depth == 1 ? XYPixmap : ZPixmap, 0, NULL,
                     stage.screenx, stage.screeny, PADDING, 0);
   Im->data = (char *)calloc(Im->bytes_per_line, Im->height);
   stage.Back = Im;
@@ -1067,7 +1069,7 @@ initstage()
     {
       *w++ = *b++ = ii;
     }
-  
+
   /*
    * now we have to locate the image files:
    */
@@ -1090,7 +1092,7 @@ initstage()
         framedir = DEFAULT_PLOCK_BW_FRAMES;
     }
   sprintf(buf, "%s/%s/%s", plockdir, framedir, CLOCK_FILE);
-  if ((Im = LoadImageFromRasterfile(Dis, Sc, buf)) == NULL)
+  if ((Im = LoadImageFromRasterfile(Dis, Sc, buf, 0)) == NULL)
     {
       fprintf(stderr, "plock: Cannot load %s, HELP!\n", buf);
       return 1;
@@ -1122,7 +1124,7 @@ initstage()
     sprintf(p, SCALE_FILE, i);
     sprintf(buf, "%s/%s/%s", plockdir, framedir, p);
   }
-  if ((Im = LoadImageFromRasterfile(Dis, Sc, buf)) == NULL)
+  if ((Im = LoadImageFromRasterfile(Dis, Sc, buf, 0)) == NULL)
     {
       fprintf(stderr, "plock: Cannot load %s, HELP!\n", buf);
       return 1;
@@ -1131,12 +1133,12 @@ initstage()
     Image1to8(&Im, PADDING);
   stage.Scale = Im;
   stage.xmin = stage.xmax = stage.ymin = stage.ymax = 0;
-  
+
   /*
-   * the ticks are stationary on the face of the clock 
+   * the ticks are stationary on the face of the clock
    * we load all.
    */
-  
+
   An = LoadAnimFromRasterfiles(Dis, Sc, TICKS_FILES, TICKSM_FILES, 21, -5, 0, 0);
   if (!An)
     {
@@ -1144,7 +1146,7 @@ initstage()
               CLOCK_FILE, TICKS_FILES);
       return 1;
     }
-  stage.ticks = CreateMovementFromAnim(An, 
+  stage.ticks = CreateMovementFromAnim(An,
                           stage.screenx - stage.Clock->width - 100 + 36,
                           stage.screeny - stage.Clock->height + 35,
                           20, -1, options.speed * 1000, 0, NULL);
@@ -1165,7 +1167,7 @@ int to, poll;
     }
   return end;
 }
-      
+
 int initgraphics()
 {
   Display *Dis;
@@ -1178,13 +1180,13 @@ int initgraphics()
   Dis = stage.Dis;
   Sc = stage.Sc;
 
-  /* 
+  /*
    * we need to keep the XImage structure itself, see below
    */
   if (stage.Clock->data)
     Free(stage.Clock->data);
   /*
-   * the ticks are stationary on the face of the clock 
+   * the ticks are stationary on the face of the clock
    * Ticks are already loaded.
    */
   mu_drawframe(options.speed * 1000, MU_POLL);
@@ -1206,7 +1208,7 @@ int initgraphics()
       if (!An)
         return 1;
       x = stage.screenx - (stage.Clock->width >> 1) - (An->width >> 1);
-      sprintf(path, "%d %d", x, 
+      sprintf(path, "%d %d", x,
               stage.screeny - stage.Clock->height - An->height + 50);
       stage.vac_bot = CreateMovementFromAnim(An, x, -(An->height / 4 * 3),
                          0, 0, 100, 0, path);
@@ -1216,25 +1218,25 @@ int initgraphics()
         return 1;
       x = stage.screenx - (stage.Clock->width >> 1) - (An->width >> 1);
       sprintf(path, "%d %d", x, stage.screeny - An->height - stage.vac_bot->an->height);
-      stage.vac_top = CreateMovementFromAnim(An, x, -An->height, 0, 0, 
+      stage.vac_top = CreateMovementFromAnim(An, x, -An->height, 0, 0,
                         100, 0, path);
       mu_drawframe(options.speed * 1000, MU_POLL);
 
       /*
-       * {-: we need no box, no lemmings and hope that nobody noticed that 
+       * {-: we need no box, no lemmings and hope that nobody noticed that
        * loading was finished so quickly :-}
        */
       return 0;
     }
   /*
-   * box_top is a stationary upper half of the lemming box 
+   * box_top is a stationary upper half of the lemming box
    * placed at the top edge of the screen above the clock.
    */
   An = LoadAnimFromRasterfiles(Dis, Sc, BOX_FILES, NULL, 1, 1, 0, 0);
   if (!An)
     return 1;
   An->frames[0]->height = An->height = 25;
-  stage.box_top = CreateMovementFromAnim(An, 
+  stage.box_top = CreateMovementFromAnim(An,
                           stage.screenx - (stage.Clock->width >> 1)
                         - (An->width >> 1),
                           0, 0, 0, 0, 2, NULL);
@@ -1246,8 +1248,8 @@ int initgraphics()
   if (!An)
     return 1;
   sprintf(path, "%d %d", stage.box_top->x, stage.box_top->y);
-  stage.box_in = CreateMovementFromAnim(An, 
-                          stage.box_top->x, -An->height >> 1, 
+  stage.box_in = CreateMovementFromAnim(An,
+                          stage.box_top->x, -An->height >> 1,
                           0, 0, 100, 0, path);
   mu_drawframe(options.speed * 1000, MU_POLL);
   /*
@@ -1256,7 +1258,7 @@ int initgraphics()
   An = LoadAnimFromRasterfiles(Dis, Sc, BOX_FILES, BOXM_FILES, 16, 1, 0, 0);
   if (!An)
     return 1;
-  stage.box_open = CreateMovementFromAnim(An, 
+  stage.box_open = CreateMovementFromAnim(An,
                           stage.box_top->x, stage.box_top->y,
                           0, 1, 200, 0, NULL);
   mu_drawframe(options.speed * 1000, MU_POLL);
@@ -1271,7 +1273,7 @@ int initgraphics()
     {
       r = init_lem_move(lp);
       if (r)
-        { 
+        {
           stage.nlems = i;
           return 1;
         }
@@ -1329,11 +1331,11 @@ void see(im)
 
   if (pm == 0)
     {
-      pm = XCreatePixmap(stage.Dis, stage.Win, 
+      pm = XCreatePixmap(stage.Dis, stage.Win,
                                              stage.screenx, stage.screeny, 1);
       pgc = XCreateGC(stage.Dis, pm, 0, 0);
     }
-  XPutImage(stage.Dis, pm, pgc, im, 
+  XPutImage(stage.Dis, pm, pgc, im,
                                        0,0,0,0, stage.screenx, stage.screeny);
   XCopyPlane(stage.Dis, pm,  stage.Win, stage.bonw,
                                      0,0, stage.screenx, stage.screeny, 0,0, 1);
@@ -1345,7 +1347,7 @@ void see(im)
 }
 
 
-int 
+int
 UpdateWorkFromBack()
 {
   int i, j, k = 0, w;
@@ -1363,12 +1365,12 @@ UpdateWorkFromBack()
                 {
                   if (*p != *g)
                     break;
-                  else 
+                  else
                     *p = GRID_UPDATE;
                 }
               *g = GRID_UPDATE;
               w = k - i;
-              ImOverIm(stage.Work, stage.Back, NULL, 
+              ImOverIm(stage.Work, stage.Back, NULL,
                        i << GRID_X_SHIFT, j << GRID_Y_SHIFT,
                        i << GRID_X_SHIFT, j << GRID_Y_SHIFT,
                        w << GRID_X_SHIFT, 1 << GRID_Y_SHIFT);
@@ -1409,7 +1411,7 @@ UpdateDisplayFromGrid()
                     break;
                 }
               w = k - i;
-              ImOverIm(stage.Work, stage.Back, NULL, 
+              ImOverIm(stage.Work, stage.Back, NULL,
                        i << GRID_X_SHIFT, j << GRID_Y_SHIFT,
                        i << GRID_X_SHIFT, j << GRID_Y_SHIFT,
                        w << GRID_X_SHIFT, 1 << GRID_Y_SHIFT);
@@ -1419,7 +1421,7 @@ UpdateDisplayFromGrid()
                 {
                   if (*p != *g)
                     break;
-                  else 
+                  else
                     *p = GRID_KEEP;
                 }
               *g = GRID_KEEP;
@@ -1429,23 +1431,23 @@ UpdateDisplayFromGrid()
                 {
                   if (pm == 0)
                     {
-                      pm = XCreatePixmap(stage.Dis, stage.Win, 
+                      pm = XCreatePixmap(stage.Dis, stage.Win,
                                          stage.screenx, stage.screeny, 1);
                       pgc = XCreateGC(stage.Dis, pm, 0, 0);
                     }
-                  XPutImage(stage.Dis, pm, pgc, stage.Work, 
-                      i << GRID_X_SHIFT, j << GRID_Y_SHIFT, 
-                      0, 0, w << GRID_X_SHIFT, 1 << GRID_Y_SHIFT); 
+                  XPutImage(stage.Dis, pm, pgc, stage.Work,
+                      i << GRID_X_SHIFT, j << GRID_Y_SHIFT,
+                      0, 0, w << GRID_X_SHIFT, 1 << GRID_Y_SHIFT);
                   XCopyPlane(stage.Dis, pm,  stage.Win, stage.bonw,
                       0, 0, w << GRID_X_SHIFT, 1 << GRID_Y_SHIFT,
-                      i << GRID_X_SHIFT, j << GRID_Y_SHIFT, 1); 
+                      i << GRID_X_SHIFT, j << GRID_Y_SHIFT, 1);
                 }
               else
 #endif
-              XPutImage(stage.Dis, stage.Win, stage.bonw, stage.Work, 
-                        i << GRID_X_SHIFT, j << GRID_Y_SHIFT, 
-                        i << GRID_X_SHIFT, j << GRID_Y_SHIFT, 
-                        w << GRID_X_SHIFT, 1 << GRID_Y_SHIFT); 
+              XPutImage(stage.Dis, stage.Win, stage.bonw, stage.Work,
+                        i << GRID_X_SHIFT, j << GRID_Y_SHIFT,
+                        i << GRID_X_SHIFT, j << GRID_Y_SHIFT,
+                        w << GRID_X_SHIFT, 1 << GRID_Y_SHIFT);
               g += w;
               i += w;
               break;
@@ -1470,24 +1472,24 @@ void drawinit()
   gcv.clip_mask = None;
   XChangeGC(stage.Dis, stage.wonb, GCClipMask, &gcv);
   XChangeGC(stage.Dis, stage.bonw, GCClipMask, &gcv);
-  XFillRectangle(stage.Dis, stage.Win, stage.bonw, 
+  XFillRectangle(stage.Dis, stage.Win, stage.bonw,
                  0, 0, stage.screenx, stage.screeny);
 
   ImOverImGrid(stage.Work, stage.Clock, NULL,
-           stage.screenx - stage.Clock->width - 100, 
-           stage.screeny - stage.Clock->height, 
+           stage.screenx - stage.Clock->width - 100,
+           stage.screeny - stage.Clock->height,
            0, 0, stage.Clock->width, stage.Clock->height, stage.grid);
-  ImOverImGrid(stage.Work, stage.Scale, NULL, 
-           stage.ticks->x, stage.ticks->y, 0, 0, 
+  ImOverImGrid(stage.Work, stage.Scale, NULL,
+           stage.ticks->x, stage.ticks->y, 0, 0,
            stage.ticks->an->width, stage.ticks->an->height, stage.grid);
-  bcopy(stage.Work->data, stage.Back->data, 
+  bcopy(stage.Work->data, stage.Back->data,
         stage.Work->bytes_per_line * stage.Work->height);
   DrawFrameGrid(stage.ticks, stage.grid);
   UpdateDisplayFromGrid();
   EraseFrameGrid(stage.ticks, stage.grid);
   UpdateWorkFromBack();
 
-  XFillRectangle(stage.Dis, stage.Win, stage.wonb, 
+  XFillRectangle(stage.Dis, stage.Win, stage.wonb,
                  LABEL_OFFSET_X - 3, LABEL_OFFSET_Y - 6, 157, 133);
   for (i = 0; labeltext[i] != NULL; i++)
     XDrawImageString(stage.Dis, stage.Win, stage.bonwl, LABEL_OFFSET_X,
@@ -1507,9 +1509,9 @@ void drawinit()
                 else LoginName = strdup(*lp->pw_gecos ? lp->pw_gecos : lp->pw_name);
   sprintf(buf1, "Station %s parked by %s", buf2, LoginName);
 
-  XDrawImageString(stage.Dis, stage.Win, stage.wonb, TEXT_XP, TEXT_YP, 
+  XDrawImageString(stage.Dis, stage.Win, stage.wonb, TEXT_XP, TEXT_YP,
                    buf1, strlen(buf1));
-  XDrawImageString(stage.Dis, stage.Win, stage.wonb, TEXT_XP, TEXT_YP+30, 
+  XDrawImageString(stage.Dis, stage.Win, stage.wonb, TEXT_XP, TEXT_YP+30,
                    "Password:", 9);
   XFlush(stage.Dis);
 }
@@ -1528,7 +1530,7 @@ play_animation()
 
   if (options.vacation)
     {
-      /* 
+      /*
        * this will give sad faces:
        */
       if (!stage.vac_top || !stage.vac_bot)
@@ -1573,12 +1575,12 @@ play_animation()
     }
 
   gettimeofday(&now, &tz);
-  i = (now.tv_sec - tstamp.tv_sec) * 1000 + 
+  i = (now.tv_sec - tstamp.tv_sec) * 1000 +
       (now.tv_usec - tstamp.tv_usec) / 1000;
   maxlems  = 1 + LEMSPEED_BASE / i;
 
   if (options.speed < 60 || options.harmless || options.nolock)
-    printf("Lemming based %smachine speed: %5.2f = 1 + %d / %d\n", 
+    printf("Lemming based %smachine speed: %5.2f = 1 + %d / %d\n",
            stage.depth > 1 ? "color " : "",
            1.0 + (double)LEMSPEED_BASE / (double)i, LEMSPEED_BASE, i);
 
@@ -1604,7 +1606,7 @@ play_animation()
   ImOverIm(stage.Back, stage.Work, NULL, m->prev_x, m->prev_y,
            m->prev_x, m->prev_y, m->an->width, m->an->height);
 
-  /* 
+  /*
    * and now here come all lemmings
    */
   sprintf(buf, "%s/%s/%s", plockdir, sounddir, SND_LETSGO);
@@ -1774,6 +1776,40 @@ int handler(dis, ev)
 typedef void (*sighandler_t)(int);
 
 
+static void Init()
+{
+  XEvent  event;
+
+  if (options.nonoise)
+    {
+      stage.beeper_volume = get_bell_vol(stage.Dis);
+      set_bell_vol(stage.Dis, 0);
+    }
+  if (initstage() != 0)
+    free_all();
+
+  XMapWindow(stage.Dis, stage.Win);
+
+  if (!options.nolock)
+    XRaiseWindow(stage.Dis, stage.Win);
+  else
+    XLowerWindow(stage.Dis, stage.Win);
+
+  // lock();
+
+  do
+    XNextEvent(stage.Dis, &event);
+  while (event.type != Expose);
+  /* this even sets LoginName... */
+  if (stage.depth > 1 && options.color && !options.nolock)
+    {
+      XInstallColormap(stage.Dis, xmap);
+      XSync(stage.Dis, False);
+    }
+  drawinit();
+}
+
+
 #if 1    // def STANDALONE
 int main(int argc, char **argv)
 {
@@ -1810,11 +1846,11 @@ int main(int argc, char **argv)
   bzero((char *)&curcol, sizeof(XColor));
   curcol.pixel = stage.black;
   /* "empty" cursor */
-  pm = XCreatePixmapFromBitmapData(stage.Dis, rootwin, 
+  pm = XCreatePixmapFromBitmapData(stage.Dis, rootwin,
                (char *)empty, 2, 2, 1, 0, 1);
   crs = XCreatePixmapCursor(stage.Dis, pm, pm, &curcol, &curcol, 0, 0);
   XFreePixmap(stage.Dis, pm);
- 
+
   xswa.cursor = crs;
   xswa.background_pixel = stage.black;
   xswa.override_redirect = True;
@@ -1832,7 +1868,7 @@ int main(int argc, char **argv)
   printf("dummy anim_ras.c main, stage.depth = %d\n", real_depth);
 #endif
 
-  /* 
+  /*
    * baeh :-)
    */
   int i = ((time(0) & 0xff) * 17) % 100;
@@ -1869,14 +1905,14 @@ int main(int argc, char **argv)
 
   xswa.border_pixel = stage.white;
 
-  stage.Win = XCreateWindow(stage.Dis, rootwin, 
+  stage.Win = XCreateWindow(stage.Dis, rootwin,
                       0, 0, width, height, 0, CopyFromParent,
-                      InputOutput, 
-                      (options.color && stage.depth > 1) ? 
+                      InputOutput,
+                      (options.color && stage.depth > 1) ?
                                                     stage.vis : CopyFromParent,
-                      CWEventMask | CWCursor | CWBackPixel | 
+                      CWEventMask | CWCursor | CWBackPixel |
                       CWBackingStore | CWBorderPixel |
-                      ((options.color && stage.depth > 1) ? CWColormap : 0) | 
+                      ((options.color && stage.depth > 1) ? CWColormap : 0) |
                       (options.nolock ? 0 : CWOverrideRedirect) ,
                       &xswa);
   wmh.input = True;
@@ -1893,12 +1929,12 @@ int main(int argc, char **argv)
   stage.bonwl = XCreateGC(stage.Dis, stage.Win,
                          GCBackground | GCForeground | GCFont, &gcval);
 
-  /* 
-   * open the window 
+  /*
+   * open the window
    * wait until we get exposed, draw the clock with its hand on 15.
    */
   debug1("Init %ld\n", time(0));
-  // Init();
+  Init();
 
   return 0;
 }

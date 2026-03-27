@@ -22,12 +22,12 @@ int real_depth;
 
 #define PADDING 32 /* bitmap_pad for XImage creation */
 
-extern int real_depth;	// read access in anim.c - it is written in plock.c:main() 
+extern int real_depth;	// read access in anim.c - it is written in plock.c:main()
 
 #ifdef STANDALONE
 struct _stage stage;	// stage.vis and stage.depth is used here.
 
-struct Option options = 
+struct Option options =
 {
   SEC_PER_TICK, 0, USE_COLOR, 0, 0, 0, 1, 0, 0
 };
@@ -114,10 +114,11 @@ static XImage *expand_1bit_to_24bit(XImage *im)
 
 
 XImage *
-LoadImageFromRasterfileFp(Dis, Sc, fp)
+LoadImageFromRasterfileFp(Dis, Sc, fp, ismask)
 Display *Dis;
 int Sc;
 FILE *fp;
+int ismask;
 {
   static int no_colors_yet = 1;
   colormap_t cmap;
@@ -131,6 +132,18 @@ FILE *fp;
       // perror("XLoadRasterfile");
       return NULL;
     }
+
+  if (ismask)
+    {
+	  // shortcut. Do not expand to 24bits or such...
+	  if (Im->depth != 1)
+	    {
+          fprintf(stderr, "FILE *fp: mask depth(%d) != 1\n", Im->depth);
+          XDestroyImage(Im);
+		  return NULL;
+		}
+	  return Im;
+	}
 
   if (options.color && cmap.map[0] && no_colors_yet && stage.depth <= 8)
     {
@@ -165,20 +178,21 @@ FILE *fp;
 }
 
 XImage *
-LoadImageFromRasterfile(Dis, Sc, name)
+LoadImageFromRasterfile(Dis, Sc, name, ismask)
 Display *Dis;
 int Sc;
 char *name;
+int ismask;	// masks are returned with depth==1, aka 1 bit per pixel data.
 {
   XImage *Im = NULL;
   FILE *fp;
-   
+
   if ((fp = fopen(name, "r")) == NULL)
     {
       perror(name);
       return NULL;
     }
-  Im = LoadImageFromRasterfileFp(Dis, Sc, fp);
+  Im = LoadImageFromRasterfileFp(Dis, Sc, fp, ismask);
   fclose(fp);
   return Im;
 }
@@ -230,7 +244,7 @@ int main(int argc, char **argv)
   static XImage *ims[100];
   for (;;)
     {
-	  XImage *im = LoadImageFromRasterfileFp(stage.Dis, stage.Sc, fp);
+	  XImage *im = LoadImageFromRasterfileFp(stage.Dis, stage.Sc, fp, 0);
 	  if (!im || ims_count > 99)
 	    break;
 	  ims[ims_count++] = im;
